@@ -55,9 +55,29 @@ export function CheckinManual({ registros, loading = false, onCheckin }: Checkin
                             key={registro.id}
                             className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/70 p-2.5"
                         >
-                            <div>
-                                <p className="text-sm font-semibold text-gray-900">{registro.aluno?.nome}</p>
-                                <p className="text-xs font-medium text-gray-500">{registro.aluno?.email ?? '-'}</p>
+                            <div className="flex items-center gap-2.5">
+                                <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#CC0000] to-[#AA0000]">
+                                    {registro.aluno?.foto_url ? (
+                                        <img
+                                            src={registro.aluno.foto_url}
+                                            alt={registro.aluno.nome}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
+                                            {registro.aluno?.nome
+                                                ?.split(' ')
+                                                .slice(0, 2)
+                                                .map((n) => n[0])
+                                                .join('')
+                                                .toUpperCase() ?? 'AL'}
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-900">{registro.aluno?.nome}</p>
+                                    <p className="text-xs font-medium text-gray-500">{registro.aluno?.email ?? '-'}</p>
+                                </div>
                             </div>
                             <button
                                 type="button"

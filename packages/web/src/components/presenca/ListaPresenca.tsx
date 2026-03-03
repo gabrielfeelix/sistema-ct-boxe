@@ -47,8 +47,32 @@ export function ListaPresenca({ registros, loading = false, onMarcar }: ListaPre
                     {registros.map((registro) => (
                         <tr key={registro.id} className="hover:bg-gray-50/70">
                             <td className="px-4 py-3">
-                                <p className="text-sm font-semibold text-gray-900">{registro.aluno?.nome ?? 'Aluno removido'}</p>
-                                <p className="text-xs font-medium text-gray-500">{registro.aluno?.email ?? '-'}</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#CC0000] to-[#AA0000]">
+                                        {registro.aluno?.foto_url ? (
+                                            <img
+                                                src={registro.aluno.foto_url}
+                                                alt={registro.aluno.nome}
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
+                                                {registro.aluno?.nome
+                                                    ?.split(' ')
+                                                    .slice(0, 2)
+                                                    .map((n) => n[0])
+                                                    .join('')
+                                                    .toUpperCase() ?? 'AL'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900">
+                                            {registro.aluno?.nome ?? 'Aluno removido'}
+                                        </p>
+                                        <p className="text-xs font-medium text-gray-500">{registro.aluno?.email ?? '-'}</p>
+                                    </div>
+                                </div>
                             </td>
                             <td className="px-4 py-3">
                                 <span
@@ -68,42 +92,45 @@ export function ListaPresenca({ registros, loading = false, onMarcar }: ListaPre
                                     : '-'}
                             </td>
                             <td className="px-4 py-3">
-                                <div className="flex flex-wrap justify-end gap-2">
+                                <div className="flex flex-wrap justify-end gap-1.5">
                                     <button
                                         type="button"
                                         onClick={() => onMarcar(registro.aluno_id, 'presente')}
                                         disabled={loading}
-                                        className="inline-flex h-8 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                        title="Marcar como presente"
+                                        className={`group flex h-8 w-8 items-center justify-center rounded-lg border transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                                            registro.status === 'presente'
+                                                ? 'border-emerald-300 bg-emerald-100 ring-2 ring-emerald-200'
+                                                : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
+                                        }`}
                                     >
-                                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                                        Presente
+                                        <CheckCircle2 className="h-4 w-4 text-emerald-700" />
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => onMarcar(registro.aluno_id, 'falta')}
                                         disabled={loading}
-                                        className="inline-flex h-8 items-center rounded-lg border border-red-200 bg-red-50 px-2.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                        title="Marcar falta"
+                                        className={`group flex h-8 w-8 items-center justify-center rounded-lg border transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                                            registro.status === 'falta'
+                                                ? 'border-red-300 bg-red-100 ring-2 ring-red-200'
+                                                : 'border-red-200 bg-red-50 hover:bg-red-100'
+                                        }`}
                                     >
-                                        <UserMinus className="mr-1 h-3.5 w-3.5" />
-                                        Falta
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => onMarcar(registro.aluno_id, 'agendado')}
-                                        disabled={loading}
-                                        className="inline-flex h-8 items-center rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <Clock3 className="mr-1 h-3.5 w-3.5" />
-                                        Pendente
+                                        <UserMinus className="h-4 w-4 text-red-700" />
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => onMarcar(registro.aluno_id, 'cancelada')}
                                         disabled={loading}
-                                        className="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-gray-100 px-2.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                        title="Cancelar presença"
+                                        className={`group flex h-8 w-8 items-center justify-center rounded-lg border transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                                            registro.status === 'cancelada'
+                                                ? 'border-gray-300 bg-gray-200 ring-2 ring-gray-300'
+                                                : 'border-gray-200 bg-gray-100 hover:bg-gray-200'
+                                        }`}
                                     >
-                                        <XCircle className="mr-1 h-3.5 w-3.5" />
-                                        Cancelar
+                                        <XCircle className="h-4 w-4 text-gray-700" />
                                     </button>
                                 </div>
                             </td>
