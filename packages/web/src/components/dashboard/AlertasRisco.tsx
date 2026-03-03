@@ -20,8 +20,9 @@ async function getAlertas(): Promise<AlertaItem[]> {
     seteDiasAtras.setDate(seteDiasAtras.getDate() - 7)
     const dezDiasAtras = new Date(hoje)
     dezDiasAtras.setDate(dezDiasAtras.getDate() - 10)
+    const dezDiasAtrasISO = dezDiasAtras.toISOString().slice(0, 10)
 
-    const [pagamentosAtrasados, contratosVencendo, alunosAtivos, avaliacoesPendentes] = await Promise.all([
+    const [pagamentosAtrasados, contratosVencendo, alunosAtivosCount, avaliacoesPendentes] = await Promise.all([
         supabase
             .from('pagamentos')
             .select('id', { count: 'exact', head: true })
@@ -31,14 +32,15 @@ async function getAlertas(): Promise<AlertaItem[]> {
             .from('contratos_com_status')
             .select('id', { count: 'exact', head: true })
             .eq('status', 'vencendo'),
-        supabase.from('alunos').select('id,nome,ultimo_treino').eq('status', 'ativo'),
+        supabase
+            .from('alunos')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'ativo')
+            .or(`ultimo_treino.lte.${dezDiasAtrasISO},ultimo_treino.is.null`),
         supabase.from('avaliacoes').select('id', { count: 'exact', head: true }).eq('status', 'agendada'),
     ])
 
-    const alunosEmRisco = ((alunosAtivos.data as Array<{ ultimo_treino: string | null }>) ?? []).filter((aluno) => {
-        if (!aluno.ultimo_treino) return true
-        return new Date(aluno.ultimo_treino) <= dezDiasAtras
-    }).length
+    const alunosEmRisco = alunosAtivosCount.count ?? 0
 
     const alertas: AlertaItem[] = []
 

@@ -104,18 +104,20 @@ export default function NovoVideoTrilhaPage() {
         setSalvando(true)
         const finalCatId = categoria
 
-        const { error: insertError } = await supabase.from('trilhas_videos').insert({
+        const { data: insertData, error: insertError } = await supabase.from('trilhas_videos').insert({
             titulo: titulo.trim(),
             descricao: descricao.trim() || null,
             categoria_id: finalCatId,
             video_url: videoUrl,
             ordem: Number(ordem) || 0,
             ativo: true,
-        })
+        }).select()
+
+        console.log('Insert Result:', { data: insertData, error: insertError })
 
         if (insertError) {
             console.error('Database Insert Error:', insertError)
-            toast.error('Erro ao arquivar vídeo: ' + insertError.message)
+            toast.error(`Erro ao arquivar vídeo: ${insertError.message} (${insertError.code})`)
             setSalvando(false)
             return
         }

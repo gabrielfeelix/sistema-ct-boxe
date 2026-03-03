@@ -5,6 +5,7 @@ import { AlertasRisco } from '@/components/dashboard/AlertasRisco'
 import { ProximasAulas } from '@/components/dashboard/ProximasAulas'
 import { UltimosCheckins } from '@/components/dashboard/UltimosCheckins'
 import { createClient } from '@/lib/supabase/server'
+import { Suspense } from 'react'
 
 interface PagamentoResumo {
     aluno_id?: string | null
@@ -144,7 +145,8 @@ async function getDashboardData() {
     }
 }
 
-export default async function DashboardPage() {
+
+async function ResumoMetricas() {
     const {
         totalAtivos,
         totalInadimplentes,
@@ -153,9 +155,55 @@ export default async function DashboardPage() {
         receitaPrevista,
         taxaPresenca,
         aulasHoje,
-        receitaSerie,
-    } =
-        await getDashboardData()
+    } = await getDashboardData()
+
+    return (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+                title="Alunos ativos"
+                value={totalAtivos.toString()}
+                subtitle={`+${novosMes} novos no mês`}
+                icon={Users}
+                trend={{ value: `${novosMes} neste mês`, positive: true }}
+                variant="default"
+            />
+            <MetricCard
+                title="Receita do mes"
+                value={`R$ ${receitaMes.toLocaleString('pt-BR')}`}
+                subtitle={`Previsto: R$ ${receitaPrevista.toLocaleString('pt-BR')}`}
+                icon={DollarSign}
+                trend={{
+                    value: receitaPrevista > 0 ? `${Math.round((receitaMes / receitaPrevista) * 100)}% da meta` : '0% da meta',
+                    positive: receitaMes >= receitaPrevista && receitaPrevista > 0,
+                }}
+                variant="success"
+            />
+            <MetricCard
+                title="Inadimplentes"
+                value={totalInadimplentes.toString()}
+                subtitle="Alunos com pagamento em atraso"
+                icon={AlertTriangle}
+                variant="danger"
+            />
+            <MetricCard
+                title="Presença semanal"
+                value={`${taxaPresenca}%`}
+                subtitle={`${aulasHoje} aula(s) hoje`}
+                icon={CheckSquare}
+                trend={{ value: `${presencaTrendLabel(taxaPresenca, aulasHoje)}`, positive: taxaPresenca >= 70 || (taxaPresenca === 0 && aulasHoje === 0) }}
+                variant="warning"
+            />
+        </div>
+    )
+}
+
+function SkeletonCard() {
+    return <div className="h-32 w-full animate-pulse rounded-xl bg-gray-200" />
+}
+
+export default async function DashboardPage() {
+    // Apenas a série histórica para o gráfico (pode ser carregada separadamente se quisermos mais velocidade)
+    // Mas por enquanto vamos permitir que o gráfico bloqueie levemente ou mover tudo para baixo
 
     return (
         <div className="mx-auto max-w-[1440px] space-y-6 pb-8">
@@ -164,56 +212,41 @@ export default async function DashboardPage() {
                 <p className="text-sm font-medium text-gray-500">Indicadores atualizados com dados reais do sistema.</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricCard
-                    title="Alunos ativos"
-                    value={totalAtivos.toString()}
-                    subtitle={`+${novosMes} novos no mês`}
-                    icon={Users}
-                    trend={{ value: `${novosMes} neste mês`, positive: true }}
-                    variant="default"
-                />
-                <MetricCard
-                    title="Receita do mes"
-                    value={`R$ ${receitaMes.toLocaleString('pt-BR')}`}
-                    subtitle={`Previsto: R$ ${receitaPrevista.toLocaleString('pt-BR')}`}
-                    icon={DollarSign}
-                    trend={{
-                        value: receitaPrevista > 0 ? `${Math.round((receitaMes / receitaPrevista) * 100)}% da meta` : '0% da meta',
-                        positive: receitaMes >= receitaPrevista && receitaPrevista > 0,
-                    }}
-                    variant="success"
-                />
-                <MetricCard
-                    title="Inadimplentes"
-                    value={totalInadimplentes.toString()}
-                    subtitle="Alunos com pagamento em atraso"
-                    icon={AlertTriangle}
-                    variant="danger"
-                />
-                <MetricCard
-                    title="Presença semanal"
-                    value={`${taxaPresenca}%`}
-                    subtitle={`${aulasHoje} aula(s) hoje`}
-                    icon={CheckSquare}
-                    trend={{ value: `${presencaTrendLabel(taxaPresenca, aulasHoje)}`, positive: taxaPresenca >= 70 || (taxaPresenca === 0 && aulasHoje === 0) }}
-                    variant="warning"
-                />
-            </div>
+            <Suspense fallback={
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                    {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+                </div>
+            }>
+                <ResumoMetricas />
+            </Suspense>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
                 <div className="xl:col-span-2">
-                    <ReceitaChart data={receitaSerie} />
+                    {/* O gráfico também pode ser movido para um componente async para não bloquear o layout principal */}
+                    <Suspense fallback={<div className="h-80 w-full animate-pulse rounded-xl bg-gray-100" />}>
+                        <GraficoReceitaSync />
+                    </Suspense>
                 </div>
-                <AlertasRisco />
+                <Suspense fallback={<SkeletonCard />}>
+                    <AlertasRisco />
+                </Suspense>
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <ProximasAulas />
-                <UltimosCheckins />
+                <Suspense fallback={<SkeletonCard />}>
+                    <ProximasAulas />
+                </Suspense>
+                <Suspense fallback={<SkeletonCard />}>
+                    <UltimosCheckins />
+                </Suspense>
             </div>
         </div>
     )
+}
+
+async function GraficoReceitaSync() {
+    const { receitaSerie } = await getDashboardData()
+    return <ReceitaChart data={receitaSerie} />
 }
 
 function presencaTrendLabel(taxa: number, aulasHoje: number) {
