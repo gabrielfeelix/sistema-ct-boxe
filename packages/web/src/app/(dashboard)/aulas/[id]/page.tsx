@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, Clock3, User, Users, ClipboardCheck } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock3, User, Users, ClipboardCheck, UserMinus } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils/formatters'
@@ -193,43 +193,41 @@ export default function AulaDetalhePage() {
                 </div>
             </section>
 
-            <PresencaStats
-                resumo={{
-                    total: aula.total_agendados + aula.total_faltas + aula.total_cancelados,
-                    presentes: aula.total_presentes,
-                    faltas: aula.total_faltas,
-                    agendados: Math.max(0, aula.total_agendados - aula.total_presentes),
-                    cancelados: aula.total_cancelados,
-                    taxa_presenca:
-                        aula.total_presentes + aula.total_faltas === 0
-                            ? 0
-                            : Math.round((aula.total_presentes / (aula.total_presentes + aula.total_faltas)) * 100),
-                }}
-            />
-
             <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">Resumo da chamada</h3>
                 <p className="mt-1 text-sm font-medium text-gray-500">
-                    Atualize presencas em tempo real pela lista da aula. Os indicadores abaixo refletem o status salvo.
+                    Acompanhamento em tempo real dos status dos alunos para esta aula.
                 </p>
-                <ul className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2 lg:grid-cols-4">
-                    <li className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Agendados</p>
-                        <p className="mt-1 text-xl font-bold text-gray-900">{aula.total_agendados}</p>
-                    </li>
-                    <li className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Presentes</p>
-                        <p className="mt-1 text-xl font-bold text-emerald-700">{aula.total_presentes}</p>
-                    </li>
-                    <li className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Faltas</p>
-                        <p className="mt-1 text-xl font-bold text-red-700">{aula.total_faltas}</p>
-                    </li>
-                    <li className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Vagas livres</p>
-                        <p className="mt-1 text-xl font-bold text-gray-900">{aula.vagas_disponiveis}</p>
-                    </li>
-                </ul>
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="flex items-center justify-between rounded-xl border border-gray-50 bg-gray-50 p-4">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Inscritos</p>
+                            <p className="mt-1 text-2xl font-black text-gray-900">{aula.total_agendados}</p>
+                        </div>
+                        <Users className="h-5 w-5 text-gray-300" />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Presentes</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-700">{aula.total_presentes}</p>
+                        </div>
+                        <ClipboardCheck className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50/50 p-4">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Faltas</p>
+                            <p className="mt-1 text-2xl font-black text-red-700">{aula.total_faltas}</p>
+                        </div>
+                        <UserMinus className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm border-dashed">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Vagas Livres</p>
+                            <p className="mt-1 text-2xl font-black text-gray-900">{aula.vagas_disponiveis}</p>
+                        </div>
+                        <div className="h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
+                    </div>
+                </div>
             </section>
 
             <CancelarAulaModal

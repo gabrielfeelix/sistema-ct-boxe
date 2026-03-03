@@ -63,7 +63,7 @@ export function Sidebar() {
         ?? professores.find(p => p.nome?.toLowerCase().includes('argel'))
         ?? (professores.length > 0 ? professores[0] : null)
 
-    const { naoLidas: totalNotificacoes } = useNotificacoes(profAtual || undefined)
+    const { naoLidasAlertas: totalNotificacoes } = useNotificacoes(profAtual || undefined)
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data }) => {

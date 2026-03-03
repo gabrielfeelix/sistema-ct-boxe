@@ -63,6 +63,8 @@ export function useNotificacoes(professor?: { nome: string, role: string }) {
     }, [fetch])
 
     const naoLidas = useMemo(() => notificacoes.filter((item) => !item.lida).length, [notificacoes])
+    const naoLidasInbox = useMemo(() => notificacoes.filter((item) => !item.lida && item.tipo === 'ct').length, [notificacoes])
+    const naoLidasAlertas = useMemo(() => notificacoes.filter((item) => !item.lida && item.tipo !== 'ct').length, [notificacoes])
 
     async function marcarComoLida(id: string, lida: boolean) {
         const { error: updateError } = await supabase
@@ -104,6 +106,8 @@ export function useNotificacoes(professor?: { nome: string, role: string }) {
         loading,
         error,
         naoLidas,
+        naoLidasInbox,
+        naoLidasAlertas,
         refetch: fetch,
         marcarComoLida,
         marcarTodasComoLidas,
