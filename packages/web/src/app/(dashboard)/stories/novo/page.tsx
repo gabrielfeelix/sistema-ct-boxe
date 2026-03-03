@@ -73,12 +73,17 @@ export default function NovoVideoTrilhaPage() {
         const ext = file.name.split('.').pop()
         const path = `trilhas/${Date.now()}.${ext}`
 
-        const { error } = await supabase.storage
+        // Verificando se o bucket existe e as permissões
+        const { error: uploadError } = await supabase.storage
             .from('ct-boxe-media')
-            .upload(path, file, { upsert: true })
+            .upload(path, file, {
+                cacheControl: '3600',
+                upsert: true
+            })
 
-        if (error) {
-            toast.error('Erro de I/O de Storage no Supabase.')
+        if (uploadError) {
+            console.error('Storage Upload Error:', uploadError)
+            toast.error('Erro de I/O no Storage: ' + (uploadError as any).message || 'Tente reduzir o tamanho do vídeo.')
             setUploadando(false)
             return
         }
@@ -86,7 +91,8 @@ export default function NovoVideoTrilhaPage() {
         const { data: urlData } = supabase.storage.from('ct-boxe-media').getPublicUrl(path)
         setVideoUrl(urlData.publicUrl)
         setUploadando(false)
-        toast.success('Vídeo pareado no servidor com sucesso!')
+        console.log('Video URL pareada:', urlData.publicUrl)
+        toast.success('Vídeo pareado no servidor!')
     }
 
     async function handleSalvar() {
@@ -98,17 +104,18 @@ export default function NovoVideoTrilhaPage() {
         setSalvando(true)
         const finalCatId = categoria
 
-        const { error } = await supabase.from('trilhas_videos').insert({
+        const { error: insertError } = await supabase.from('trilhas_videos').insert({
             titulo: titulo.trim(),
             descricao: descricao.trim() || null,
-            categoria_id: finalCatId, // Relacao ForeignKey
+            categoria_id: finalCatId,
             video_url: videoUrl,
-            ordem: ordem,
+            ordem: Number(ordem) || 0,
             ativo: true,
         })
 
-        if (error) {
-            toast.error('Erro ao injetar vídeo na trilha.')
+        if (insertError) {
+            console.error('Database Insert Error:', insertError)
+            toast.error('Erro ao arquivar vídeo: ' + insertError.message)
             setSalvando(false)
             return
         }

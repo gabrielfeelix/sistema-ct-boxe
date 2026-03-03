@@ -153,6 +153,12 @@ export default function NotificacoesPage() {
     const listaFiltrada = useMemo(() => {
         const termo = busca.trim().toLowerCase()
         return notificacoes.filter((item) => {
+            // Se guia é Inbox, o Admin quer ver o que ele ENVIOU (Avisos Gerais / CT)
+            // Ou o que não é automação sistêmica vinculada a Aluno específico (tipo 'ct')
+            const ehAvisoAdmin = item.tipo === 'ct' || !item.aluno_id
+
+            if (!ehAvisoAdmin) return false
+
             if (filtro === 'nao_lidas' && item.lida) return false
             if (!termo) return true
             const alvo = [item.titulo, item.subtitulo, item.mensagem, item.aluno?.nome].filter(Boolean).join(' ').toLowerCase()
@@ -184,17 +190,32 @@ export default function NotificacoesPage() {
 
     async function handleDispararPush() {
         if (!disparoTitulo) { toast.error('Insira o título do push.'); return }
-        if (['youtube', 'instagram'].includes(disparoTipo) && !disparoURL) { toast.error('Insira o link da rede social.'); return }
 
         setEnviandoPush(true)
-        // Simulate API call to notification engine
-        await new Promise(resolve => setTimeout(resolve, 800))
-        toast.success(`Push Notification enviado para os alunos com sucesso!`)
+
+        // Criar notificação no Banco para que apareça no App e no Painel (Inbox)
+        const { error: insertError } = await supabase.from('notificacoes').insert({
+            titulo: disparoTitulo,
+            mensagem: disparoMensagem,
+            tipo: 'ct',
+            link: disparoURL || null,
+            lida: false
+        })
+
+        if (insertError) {
+            toast.error('Erro ao registrar disparo: ' + insertError.message)
+            setEnviandoPush(false)
+            return
+        }
+
+        toast.success(`Disparo realizado com sucesso! Os alunos receberão o alerta.`)
         setEnviandoPush(false)
         setModalDisparo(false)
         setDisparoTitulo('')
         setDisparoMensagem('')
         setDisparoURL('')
+        // Recarregar lista para mostrar a nova notificação no Inbox
+        window.location.reload()
     }
 
     return (
