@@ -85,6 +85,28 @@ export default function RelatoriosPage() {
         document.body.removeChild(link)
     }
 
+    function handleExportXLS() {
+        const s = '\t'
+        const header = `Data${s}Aluno${s}Metodo${s}Valor`
+        const rows = ultimosPagamentos.map(p => {
+            const d = formatDate(p.data_pagamento)
+            const a = p.aluno?.nome || 'Desconhecido'
+            const m = p.metodo || 'PIX'
+            const v = p.valor.toString().replace('.', ',')
+            return `${d}${s}${a}${s}${m}${s}${v}`
+        })
+
+        const content = [header, ...rows].join('\n')
+        const blob = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.setAttribute("href", url)
+        link.setAttribute("download", `relatorio_pgtos_${new Date().toISOString().split('T')[0]}.xls`)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
     if (loading) return <LoadingSpinner label="Gerando relatórios..." />
 
     return (
@@ -98,12 +120,17 @@ export default function RelatoriosPage() {
                     <p className="text-sm text-gray-500 mt-1">Visão geral do CT referente ao mês atual.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleExportCSV}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors shadow-sm"
-                    >
-                        <Download className="w-4 h-4" /> Exportar Pagamentos (CSV)
-                    </button>
+                    <div className="relative group/export">
+                        <button
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors shadow-sm"
+                        >
+                            <Download className="w-4 h-4" /> Exportar Planilha
+                        </button>
+                        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 rounded-xl shadow-xl py-2 invisible group-hover/export:visible z-50 transition-all opacity-0 group-hover/export:opacity-100">
+                            <button onClick={handleExportCSV} className="w-full text-left px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900">.CSV (Universal)</button>
+                            <button onClick={handleExportXLS} className="w-full text-left px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900">.XLS (Excel Antigo)</button>
+                        </div>
+                    </div>
                     <button
                         onClick={handlePrint}
                         className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#CC0000] hover:bg-[#AA0000] rounded-xl transition-colors shadow-sm"

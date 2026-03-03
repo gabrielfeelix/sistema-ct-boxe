@@ -80,17 +80,17 @@ export default function CandidatosPage() {
             )}
 
             {/* Barra de Filtros (Tabs Clean) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                     {STATUS_OPTIONS.map(opt => (
                         <button
                             key={opt.value}
                             onClick={() => setStatusFiltro(opt.value)}
                             className={`
-                                px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap
+                                px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap
                                 ${statusFiltro === opt.value
-                                    ? 'bg-gray-100 text-gray-900 shadow-sm'
-                                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                                    ? 'bg-gray-900 text-white shadow-sm'
+                                    : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 hover:bg-gray-50'
                                 }
                             `}
                         >
@@ -106,7 +106,7 @@ export default function CandidatosPage() {
                         placeholder="Buscar pelo nome..."
                         value={busca}
                         onChange={(e) => setBusca(e.target.value)}
-                        className="w-full sm:w-64 pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#CC0000] focus:border-[#CC0000]"
+                        className="w-full sm:w-64 pl-9 pr-4 h-11 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#CC0000] focus:border-[#CC0000] bg-white shadow-sm"
                     />
                 </div>
             </div>

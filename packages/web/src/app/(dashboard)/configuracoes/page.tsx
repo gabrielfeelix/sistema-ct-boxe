@@ -44,8 +44,6 @@ function ConfigCard({
             href={href}
             className="group relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
         >
-            <div className={`pointer-events-none absolute -right-10 -top-8 h-28 w-28 rounded-full blur-2xl ${tone}`} />
-
             <div className="relative z-10 flex items-start justify-between gap-4">
                 <div>
                     <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700">
@@ -74,9 +72,6 @@ export default async function ConfiguracoesPage() {
     return (
         <div className="mx-auto max-w-[1200px] space-y-6 pb-8">
             <section className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
-                <div className="pointer-events-none absolute -left-10 top-2 h-40 w-40 rounded-full bg-red-400/20 blur-3xl" />
-                <div className="pointer-events-none absolute -right-10 bottom-0 h-44 w-44 rounded-full bg-orange-400/20 blur-3xl" />
-
                 <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight text-gray-900">
@@ -129,7 +124,6 @@ export default async function ConfiguracoesPage() {
                     badge={snapshot.naoLidas > 0 ? `${snapshot.naoLidas} novas` : undefined}
                 />
                 <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-                    <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-emerald-400/20 blur-2xl" />
                     <div className="relative z-10">
                         <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700">
                             <ShieldCheck className="h-5 w-5" />

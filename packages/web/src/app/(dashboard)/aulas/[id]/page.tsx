@@ -8,8 +8,11 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils/formatters'
 import { useAula, useAulas } from '@/hooks/useAulas'
+import { usePresencaAula, type PresencaStatus } from '@/hooks/usePresenca'
 import { CancelarAulaModal } from '@/components/aulas/CancelarAulaModal'
 import { PresencaStats } from '@/components/presenca/PresencaStats'
+import { ListaPresenca } from '@/components/presenca/ListaPresenca'
+import { CheckinManual } from '@/components/presenca/CheckinManual'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
 export default function AulaDetalhePage() {
@@ -21,8 +24,40 @@ export default function AulaDetalhePage() {
     const { aula, loading, error, refetch } = useAula(aulaId)
     const { atualizarAula, cancelarAula } = useAulas()
 
+    // hooks de presenca
+    const { registros, loading: loadingPresenca, error: errorPresenca, marcarPresenca, checkinManual } = usePresencaAula(aulaId)
+
     const [cancelModalOpen, setCancelModalOpen] = useState(false)
     const [updating, setUpdating] = useState(false)
+    const [savingPresenca, setSavingPresenca] = useState(false)
+
+    async function handleMarcar(alunoId: string, status: PresencaStatus) {
+        setSavingPresenca(true)
+        const resultado = await marcarPresenca(alunoId, status)
+        setSavingPresenca(false)
+
+        if (!resultado.ok) {
+            toast.error(resultado.error ?? 'Não foi possível atualizar a presenca.')
+            return
+        }
+
+        toast.success('Presenca atualizada.')
+        await refetch()
+    }
+
+    async function handleCheckin(alunoId: string) {
+        setSavingPresenca(true)
+        const resultado = await checkinManual(alunoId)
+        setSavingPresenca(false)
+
+        if (!resultado.ok) {
+            toast.error(resultado.error ?? 'Não foi possível registrar o check-in.')
+            return
+        }
+
+        toast.success('Check-in manual registrado.')
+        await refetch()
+    }
 
     async function finalizarAula() {
         if (!aula) return
@@ -134,22 +169,25 @@ export default function AulaDetalhePage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                        <Link
-                            href={`/presenca/${aula.id}`}
-                            className="inline-flex h-10 items-center rounded-lg bg-[#CC0000] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#AA0000]"
-                        >
-                            <ClipboardCheck className="mr-2 h-4 w-4" />
-                            Abrir lista de presenca
-                        </Link>
                         {aula.status === 'agendada' && (
-                            <button
-                                type="button"
-                                className="inline-flex h-10 items-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                onClick={() => setCancelModalOpen(true)}
-                                disabled={updating}
-                            >
-                                Cancelar aula
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    className="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    onClick={finalizarAula}
+                                    disabled={updating}
+                                >
+                                    Marcar como realizada
+                                </button>
+                                <button
+                                    type="button"
+                                    className="inline-flex h-10 items-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    onClick={() => setCancelModalOpen(true)}
+                                    disabled={updating}
+                                >
+                                    Cancelar aula
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -202,6 +240,17 @@ export default function AulaDetalhePage() {
                 onOpenChange={setCancelModalOpen}
                 onConfirm={handleCancelConfirm}
             />
+
+            {loadingPresenca ? (
+                <LoadingSpinner label="Carregando chamada..." />
+            ) : errorPresenca ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{errorPresenca}</div>
+            ) : (
+                <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+                    <ListaPresenca registros={registros} loading={savingPresenca} onMarcar={handleMarcar} />
+                    <CheckinManual registros={registros} loading={savingPresenca} onCheckin={handleCheckin} />
+                </div>
+            )}
         </div>
     )
 }

@@ -35,6 +35,12 @@ export default function FeedPage() {
     const { professores } = useProfessoresSelect()
     const [userEmail, setUserEmail] = useState<string | null>(null)
 
+    const [comentarios, setComentarios] = useState<Record<string, any[]>>({})
+    const [comentandoEm, setComentandoEm] = useState<string | null>(null)
+    const [novoComentario, setNovoComentario] = useState('')
+    const [enviandoComentario, setEnviandoComentario] = useState(false)
+    const [carregandoComentarios, setCarregandoComentarios] = useState<Record<string, boolean>>({})
+
     useEffect(() => {
         supabase.auth.getUser().then(({ data }) => {
             setUserEmail(data.user?.email ?? null)
@@ -78,6 +84,61 @@ export default function FeedPage() {
         const matchesProfessor = filtroProfessor === 'todos' || post.autor === filtroProfessor;
         return matchesBusca && matchesProfessor;
     })
+
+    async function carregarComentarios(postId: string) {
+        if (comentandoEm === postId) {
+            setComentandoEm(null)
+            return
+        }
+
+        setComentandoEm(postId)
+        if (comentarios[postId]) return
+
+        setCarregandoComentarios(prev => ({ ...prev, [postId]: true }))
+        const { data, error } = await supabase
+            .from('post_comentarios')
+            .select('*')
+            .eq('post_id', postId)
+            .order('created_at', { ascending: true })
+
+        if (error) {
+            toast.error('Erro ao carregar interações.')
+        } else {
+            setComentarios(prev => ({ ...prev, [postId]: data || [] }))
+        }
+        setCarregandoComentarios(prev => ({ ...prev, [postId]: false }))
+    }
+
+    async function handleEnviarComentario(postId: string) {
+        if (!novoComentario.trim()) return
+
+        setEnviandoComentario(true)
+        const { data: { user } } = await supabase.auth.getUser()
+
+        const { data, error } = await supabase
+            .from('post_comentarios')
+            .insert({
+                post_id: postId,
+                aluno_id: user?.id,
+                autor_nome: profAtual?.nome || 'Admin',
+                texto: novoComentario.trim()
+            })
+            .select()
+            .single()
+
+        if (error) {
+            toast.error('Não foi possível enviar o comentário.')
+        } else {
+            setComentarios(prev => ({
+                ...prev,
+                [postId]: [...(prev[postId] || []), data]
+            }))
+            setNovoComentario('')
+            toast.success('Comentário enviado!')
+            refetch()
+        }
+        setEnviandoComentario(false)
+    }
 
     return (
         <div className="space-y-6 max-w-3xl mx-auto pb-12 animate-in slide-in-from-bottom-2 duration-500">
@@ -192,8 +253,6 @@ export default function FeedPage() {
 
                                 <div className="px-5 sm:px-6 pb-5">
                                     {/* Stats + Ações Reais */}
-
-                                    {/* Stats + Ações Reais */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-6 pt-5 border-t border-gray-100 gap-4">
 
                                         <div className="flex items-center gap-6">
@@ -203,12 +262,15 @@ export default function FeedPage() {
                                                 </div>
                                                 <span className="text-xs font-black text-gray-600">{post.total_curtidas} <span className="hidden sm:inline-block text-gray-400 font-bold ml-1">Curtidas</span></span>
                                             </div>
-                                            <div className="flex items-center gap-2 group cursor-default">
+                                            <button
+                                                onClick={() => carregarComentarios(post.id)}
+                                                className="flex items-center gap-2 group cursor-pointer"
+                                            >
                                                 <div className="p-2 bg-gray-50 rounded-full group-hover:bg-blue-50 transition-colors border border-gray-100">
                                                     <MessageCircle className="h-4 w-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
                                                 </div>
                                                 <span className="text-xs font-black text-gray-600">{post.total_comentarios} <span className="hidden sm:inline-block text-gray-400 font-bold ml-1">Interações</span></span>
-                                            </div>
+                                            </button>
                                         </div>
 
                                         <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100 justify-between sm:justify-end">
@@ -229,6 +291,53 @@ export default function FeedPage() {
                                         </div>
 
                                     </div>
+
+                                    {/* Area de Comentarios Expandida */}
+                                    {comentandoEm === post.id && (
+                                        <div className="mt-6 pt-6 border-t border-gray-50 animate-in slide-in-from-top-2 duration-300">
+                                            {carregandoComentarios[post.id] ? (
+                                                <div className="flex justify-center py-4"><LoadingSpinner size="sm" /></div>
+                                            ) : (
+                                                <div className="space-y-4 mb-6">
+                                                    {(comentarios[post.id] || []).map((coment: any) => (
+                                                        <div key={coment.id} className="flex gap-3">
+                                                            <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400 shrink-0">
+                                                                {coment.autor_nome?.slice(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div className="flex-1 bg-gray-50 rounded-2xl px-4 py-3 border border-gray-100">
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <span className="text-xs font-black text-gray-900">{coment.autor_nome}</span>
+                                                                    <span className="text-[9px] font-bold text-gray-400 uppercase">{tempoRelativo(coment.created_at)}</span>
+                                                                </div>
+                                                                <p className="text-sm text-gray-700 font-medium">{coment.texto}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {(comentarios[post.id] || []).length === 0 && (
+                                                        <p className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest py-4">Nenhuma interação ainda por aqui.</p>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={novoComentario}
+                                                    onChange={e => setNovoComentario(e.target.value)}
+                                                    placeholder="Escreva um comentário..."
+                                                    className="flex-1 h-10 bg-gray-50 border border-gray-100 rounded-xl px-4 text-sm font-medium outline-none focus:bg-white focus:border-blue-500 transition-all"
+                                                    onKeyDown={e => e.key === 'Enter' && handleEnviarComentario(post.id)}
+                                                />
+                                                <button
+                                                    onClick={() => handleEnviarComentario(post.id)}
+                                                    disabled={enviandoComentario || !novoComentario.trim()}
+                                                    className="h-10 px-4 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                                                >
+                                                    {enviandoComentario ? '...' : 'Enviar'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
