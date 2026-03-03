@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Search, UserPlus } from 'lucide-react'
 import type { PresencaRegistro } from '@/hooks/usePresenca'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface CheckinManualProps {
     registros: PresencaRegistro[]
@@ -56,24 +57,12 @@ export function CheckinManual({ registros, loading = false, onCheckin }: Checkin
                             className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/70 p-2.5"
                         >
                             <div className="flex items-center gap-2.5">
-                                <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#CC0000] to-[#AA0000]">
-                                    {registro.aluno?.foto_url ? (
-                                        <img
-                                            src={registro.aluno.foto_url}
-                                            alt={registro.aluno.nome}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
-                                            {registro.aluno?.nome
-                                                ?.split(' ')
-                                                .slice(0, 2)
-                                                .map((n) => n[0])
-                                                .join('')
-                                                .toUpperCase() ?? 'AL'}
-                                        </div>
-                                    )}
-                                </div>
+                                <Avatar className="h-9 w-9 border border-gray-100 shadow-sm">
+                                    <AvatarImage src={registro.aluno?.foto_url} alt={registro.aluno?.nome} />
+                                    <AvatarFallback className="bg-gray-100 text-[10px] font-bold text-gray-400">
+                                        {registro.aluno?.nome?.slice(0, 2).toUpperCase() ?? '?'}
+                                    </AvatarFallback>
+                                </Avatar>
                                 <div>
                                     <p className="text-sm font-semibold text-gray-900">{registro.aluno?.nome}</p>
                                     <p className="text-xs font-medium text-gray-500">{registro.aluno?.email ?? '-'}</p>
