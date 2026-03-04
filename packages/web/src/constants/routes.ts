@@ -24,6 +24,8 @@ export const ROUTES = {
     FEED_NOVO_POST: '/feed/novo-post',
     STORIES: '/stories',
     STORY_NOVO: '/stories/novo',
+    EVENTOS: '/eventos',
+    EVENTO_NOVO: '/eventos/novo',
     NOTIFICACOES: '/notificacoes',
     CONFIGURACOES: '/configuracoes',
     CONFIG_PLANOS: '/configuracoes/planos',

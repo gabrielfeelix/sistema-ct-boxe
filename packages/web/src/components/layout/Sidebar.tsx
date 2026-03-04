@@ -20,6 +20,7 @@ import {
     BarChart2,
     ShieldCheck,
     GraduationCap,
+    PartyPopper,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -45,6 +46,7 @@ const navItems = [
     { label: 'Professores', href: '/professores', icon: GraduationCap, adminOnly: true },
     { label: 'Feed', href: ROUTES.FEED, icon: Rss },
     { label: 'Stories', href: ROUTES.STORIES, icon: Play },
+    { label: 'Eventos', href: ROUTES.EVENTOS, icon: PartyPopper },
     { label: 'Notificações', href: ROUTES.NOTIFICACOES, icon: Bell },
     { label: 'Relatórios', href: '/relatorios', icon: BarChart2, adminOnly: true },
 ]
