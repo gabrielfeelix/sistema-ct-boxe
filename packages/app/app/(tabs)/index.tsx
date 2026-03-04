@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
     Alert,
     Animated,
+    FlatList,
     Linking,
     RefreshControl,
     ScrollView,
     Text,
     TouchableOpacity,
     View,
+    Image,
 } from 'react-native'
 
 import StoryViewer from '@/components/StoryViewer'
@@ -151,23 +153,24 @@ export default function HomeScreen() {
                 </View>
 
                 <View className="border-b border-slate-50 bg-white pb-2 pt-6">
-                    <ScrollView
+                    <FlatList
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        className="pl-6"
-                        contentContainerStyle={{ paddingRight: 40 }}
-                    >
-                        {homeData.stories.map((story, index) => (
+                        data={homeData.stories}
+                        keyExtractor={(story) => story.id}
+                        contentContainerStyle={{ paddingLeft: 24, paddingRight: 40 }}
+                        removeClippedSubviews={true}
+                        maxToRenderPerBatch={10}
+                        windowSize={5}
+                        renderItem={({ item: story, index }) => (
                             <TouchableOpacity
                                 activeOpacity={0.8}
-                                key={story.id}
                                 onPress={() => openStory(index)}
                                 className="mr-5 items-center"
                             >
                                 <View
-                                    className={`mb-2 h-16 w-16 rounded-full border-[2.5px] p-[2px] ${
-                                        !story.assistido ? 'border-[#CC0000]' : 'border-slate-300'
-                                    }`}
+                                    className={`mb-2 h-16 w-16 rounded-full border-[2.5px] p-[2px] ${!story.assistido ? 'border-[#CC0000]' : 'border-slate-300'
+                                        }`}
                                 >
                                     <View className="flex-1 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-800 shadow-sm">
                                         <Text className="text-xl font-black tracking-tighter text-white">
@@ -179,8 +182,8 @@ export default function HomeScreen() {
                                     {story.nome}
                                 </Text>
                             </TouchableOpacity>
-                        ))}
-                    </ScrollView>
+                        )}
+                    />
                 </View>
 
                 <View className="px-6 pt-8">
@@ -218,11 +221,10 @@ export default function HomeScreen() {
                                     <TouchableOpacity
                                         activeOpacity={0.8}
                                         onPress={() => handleConfirmar(proximaAula.id)}
-                                        className={`h-14 flex-row items-center justify-center rounded-2xl shadow-md ${
-                                            isAulaConfirmada
+                                        className={`h-14 flex-row items-center justify-center rounded-2xl shadow-md ${isAulaConfirmada
                                                 ? 'bg-emerald-500 shadow-emerald-900/30'
                                                 : 'bg-[#CC0000] shadow-red-900/30'
-                                        }`}
+                                            }`}
                                     >
                                         <Text className="text-base font-bold tracking-wide text-white">
                                             {isAulaConfirmada ? 'PRESENCA CONFIRMADA' : 'CONFIRMAR PRESENCA'}
@@ -276,14 +278,12 @@ export default function HomeScreen() {
                                                     {aula.horario}
                                                 </Text>
                                                 <View
-                                                    className={`rounded-md px-2 py-1 ${
-                                                        isLivre ? 'bg-emerald-50' : 'bg-slate-100'
-                                                    }`}
+                                                    className={`rounded-md px-2 py-1 ${isLivre ? 'bg-emerald-50' : 'bg-slate-100'
+                                                        }`}
                                                 >
                                                     <Text
-                                                        className={`text-[10px] font-black uppercase tracking-widest ${
-                                                            isLivre ? 'text-emerald-600' : 'text-slate-500'
-                                                        }`}
+                                                        className={`text-[10px] font-black uppercase tracking-widest ${isLivre ? 'text-emerald-600' : 'text-slate-500'
+                                                            }`}
                                                     >
                                                         {isLivre ? 'LIVRE' : 'LOTADA'}
                                                     </Text>
@@ -313,28 +313,26 @@ export default function HomeScreen() {
                                         <TouchableOpacity
                                             activeOpacity={0.8}
                                             onPress={() => !isConfirmado && isLivre && handleAgendar(aula.id)}
-                                            className={`h-10 flex-row items-center justify-center rounded-xl px-4 ${
-                                                isConfirmado
+                                            className={`h-10 flex-row items-center justify-center rounded-xl px-4 ${isConfirmado
                                                     ? 'bg-emerald-500'
                                                     : !isLivre
-                                                      ? 'bg-slate-100'
-                                                      : 'border border-red-100 bg-red-50'
-                                            }`}
+                                                        ? 'bg-slate-100'
+                                                        : 'border border-red-100 bg-red-50'
+                                                }`}
                                         >
                                             <Text
-                                                className={`text-[10px] font-black uppercase tracking-widest ${
-                                                    isConfirmado
+                                                className={`text-[10px] font-black uppercase tracking-widest ${isConfirmado
                                                         ? 'text-white'
                                                         : !isLivre
-                                                          ? 'text-slate-400'
-                                                          : 'text-[#CC0000]'
-                                                }`}
+                                                            ? 'text-slate-400'
+                                                            : 'text-[#CC0000]'
+                                                    }`}
                                             >
                                                 {isConfirmado
                                                     ? 'PRESENCA REGISTRADA'
                                                     : !isLivre
-                                                      ? 'ESGOTADO'
-                                                      : 'AGENDAR PRESENCA'}
+                                                        ? 'ESGOTADO'
+                                                        : 'AGENDAR PRESENCA'}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -396,15 +394,14 @@ export default function HomeScreen() {
                             <TouchableOpacity
                                 activeOpacity={0.7}
                                 onPress={() => openLink('whatsapp://send?phone=5541999999999')}
-                                className="mb-4 w-[48%] items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/50"
+                                className="mb-4 w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
                             >
-                                <FontAwesome5
-                                    name="whatsapp"
-                                    size={24}
-                                    color="#10B981"
-                                    style={{ marginBottom: 8 }}
+                                <Image
+                                    source={require('../../assets/whatsapp.png')}
+                                    style={{ width: 36, height: 36, marginBottom: 10 }}
+                                    resizeMode="contain"
                                 />
-                                <Text className="text-center text-xs font-bold tracking-tight text-emerald-800">
+                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
                                     Grupo Oficial
                                 </Text>
                             </TouchableOpacity>
@@ -412,10 +409,14 @@ export default function HomeScreen() {
                             <TouchableOpacity
                                 activeOpacity={0.7}
                                 onPress={() => openLink('https://instagram.com/ctargelriboli')}
-                                className="mb-4 w-[48%] items-center justify-center rounded-2xl border border-purple-100 bg-purple-50 p-4 shadow-sm shadow-purple-200/50"
+                                className="mb-4 w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
                             >
-                                <Feather name="instagram" size={24} color="#9333EA" style={{ marginBottom: 8 }} />
-                                <Text className="text-center text-xs font-bold tracking-tight text-purple-800">
+                                <Image
+                                    source={require('../../assets/instagram.png')}
+                                    style={{ width: 36, height: 36, marginBottom: 10 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
                                     Instagram
                                 </Text>
                             </TouchableOpacity>
@@ -423,10 +424,14 @@ export default function HomeScreen() {
                             <TouchableOpacity
                                 activeOpacity={0.7}
                                 onPress={() => openLink('https://youtube.com')}
-                                className="w-[48%] items-center justify-center rounded-2xl border border-red-100 bg-red-50 p-4 shadow-sm shadow-red-200/50"
+                                className="w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
                             >
-                                <Feather name="youtube" size={24} color="#DC2626" style={{ marginBottom: 8 }} />
-                                <Text className="text-center text-xs font-bold tracking-tight text-red-800">
+                                <Image
+                                    source={require('../../assets/youtube.png')}
+                                    style={{ width: 36, height: 36, marginBottom: 10 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
                                     Aulas YT
                                 </Text>
                             </TouchableOpacity>
@@ -434,10 +439,14 @@ export default function HomeScreen() {
                             <TouchableOpacity
                                 activeOpacity={0.7}
                                 onPress={() => openLink('https://google.com/maps')}
-                                className="w-[48%] items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 p-4 shadow-sm shadow-blue-200/50"
+                                className="w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
                             >
-                                <FontAwesome5 name="google" size={24} color="#2563EB" style={{ marginBottom: 8 }} />
-                                <Text className="text-center text-xs font-bold tracking-tight text-blue-800">
+                                <Image
+                                    source={require('../../assets/google.png')}
+                                    style={{ width: 36, height: 36, marginBottom: 10 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
                                     Avalie-nos
                                 </Text>
                             </TouchableOpacity>

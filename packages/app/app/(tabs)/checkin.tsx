@@ -24,10 +24,18 @@ export default function CheckinScreen() {
     const [data, setData] = useState<CheckinData>(emptyCheckinData)
 
     const loadData = useCallback(async () => {
-        if (!aluno?.id) return
-        const next = await fetchCheckinData(aluno.id)
-        setData(next)
-        setLoadingData(false)
+        if (!aluno?.id) {
+            setLoadingData(false)
+            return
+        }
+        try {
+            const next = await fetchCheckinData(aluno.id)
+            setData(next)
+        } catch (error) {
+            console.error('[Checkin] Erro ao carregar dados:', error)
+        } finally {
+            setLoadingData(false)
+        }
     }, [aluno?.id])
 
     useEffect(() => {
@@ -49,16 +57,16 @@ export default function CheckinScreen() {
         return animValues[id]
     }
 
-    const handleCheckin = async (aulaId: string) => {
+    const handleCheckin = useCallback(async (aulaId: string) => {
         if (!aluno?.id || loadingAction) return
         setLoadingAction(true)
         await setPresencaStatus(aluno.id, aulaId, 'presente')
         await loadData()
         setLoadingAction(false)
         Alert.alert('Presenca confirmada', 'Seu check-in foi registrado com sucesso.')
-    }
+    }, [aluno?.id, loadingAction, loadData])
 
-    const handleAgendar = async (aulaId: string) => {
+    const handleAgendar = useCallback(async (aulaId: string) => {
         if (!aluno?.id) return
         const anim = getAnimValue(aulaId)
         Animated.sequence([
@@ -69,9 +77,9 @@ export default function CheckinScreen() {
         await setPresencaStatus(aluno.id, aulaId, 'agendado')
         await loadData()
         Alert.alert('Sucesso', 'Agendamento realizado.')
-    }
+    }, [aluno?.id, loadData])
 
-    const handleCancelarAgendamento = (aulaId: string) => {
+    const handleCancelarAgendamento = useCallback((aulaId: string) => {
         if (!aluno?.id) return
         Alert.alert('Cancelar agendamento?', 'Tem certeza que deseja cancelar sua reserva?', [
             { text: 'Nao', style: 'cancel' },
@@ -85,7 +93,7 @@ export default function CheckinScreen() {
                 },
             },
         ])
-    }
+    }, [aluno?.id, loadData])
 
     const listaAgendamento = agendarDia === 'hoje' ? data.hoje : data.amanha
     const proximaAula = data.proximaAula
@@ -101,14 +109,12 @@ export default function CheckinScreen() {
                     <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={() => setTabAtiva('hoje')}
-                        className={`flex-1 items-center rounded-xl py-3 ${
-                            tabAtiva === 'hoje' ? 'border border-slate-100 bg-white shadow-sm shadow-slate-200' : ''
-                        }`}
+                        className={`flex-1 items-center rounded-xl py-3 ${tabAtiva === 'hoje' ? 'border border-slate-100 bg-white shadow-sm shadow-slate-200' : ''
+                            }`}
                     >
                         <Text
-                            className={`font-bold tracking-wide ${
-                                tabAtiva === 'hoje' ? 'text-slate-900' : 'text-slate-400'
-                            }`}
+                            className={`font-bold tracking-wide ${tabAtiva === 'hoje' ? 'text-slate-900' : 'text-slate-400'
+                                }`}
                         >
                             Hoje
                         </Text>
@@ -116,16 +122,14 @@ export default function CheckinScreen() {
                     <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={() => setTabAtiva('agendar')}
-                        className={`flex-1 items-center rounded-xl py-3 ${
-                            tabAtiva === 'agendar'
+                        className={`flex-1 items-center rounded-xl py-3 ${tabAtiva === 'agendar'
                                 ? 'border border-slate-100 bg-white shadow-sm shadow-slate-200'
                                 : ''
-                        }`}
+                            }`}
                     >
                         <Text
-                            className={`font-bold tracking-wide ${
-                                tabAtiva === 'agendar' ? 'text-slate-900' : 'text-slate-400'
-                            }`}
+                            className={`font-bold tracking-wide ${tabAtiva === 'agendar' ? 'text-slate-900' : 'text-slate-400'
+                                }`}
                         >
                             Agendar
                         </Text>
@@ -181,11 +185,10 @@ export default function CheckinScreen() {
                                     activeOpacity={0.8}
                                     onPress={() => handleCheckin(proximaAula.id)}
                                     disabled={isConfirmado || loadingAction}
-                                    className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${
-                                        isConfirmado
+                                    className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${isConfirmado
                                             ? 'bg-emerald-500 shadow-emerald-500/30'
                                             : 'bg-[#CC0000] shadow-red-900/40'
-                                    }`}
+                                        }`}
                                     style={{ opacity: loadingAction ? 0.7 : 1 }}
                                 >
                                     <Feather
@@ -198,8 +201,8 @@ export default function CheckinScreen() {
                                         {loadingAction
                                             ? 'PROCESSANDO...'
                                             : isConfirmado
-                                              ? 'PRESENCA CONFIRMADA'
-                                              : 'FAZER CHECK-IN AGORA'}
+                                                ? 'PRESENCA CONFIRMADA'
+                                                : 'FAZER CHECK-IN AGORA'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -219,28 +222,24 @@ export default function CheckinScreen() {
                             <View className="flex-row rounded-xl border border-slate-100 bg-slate-50 p-1">
                                 <TouchableOpacity
                                     onPress={() => setAgendarDia('hoje')}
-                                    className={`rounded-lg px-4 py-1.5 ${
-                                        agendarDia === 'hoje' ? 'bg-[#CC0000]' : 'bg-transparent'
-                                    }`}
+                                    className={`rounded-lg px-4 py-1.5 ${agendarDia === 'hoje' ? 'bg-[#CC0000]' : 'bg-transparent'
+                                        }`}
                                 >
                                     <Text
-                                        className={`text-xs font-black uppercase tracking-widest ${
-                                            agendarDia === 'hoje' ? 'text-white' : 'text-slate-400'
-                                        }`}
+                                        className={`text-xs font-black uppercase tracking-widest ${agendarDia === 'hoje' ? 'text-white' : 'text-slate-400'
+                                            }`}
                                     >
                                         Hoje
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => setAgendarDia('amanha')}
-                                    className={`rounded-lg px-4 py-1.5 ${
-                                        agendarDia === 'amanha' ? 'bg-[#CC0000]' : 'bg-transparent'
-                                    }`}
+                                    className={`rounded-lg px-4 py-1.5 ${agendarDia === 'amanha' ? 'bg-[#CC0000]' : 'bg-transparent'
+                                        }`}
                                 >
                                     <Text
-                                        className={`text-xs font-black uppercase tracking-widest ${
-                                            agendarDia === 'amanha' ? 'text-white' : 'text-slate-400'
-                                        }`}
+                                        className={`text-xs font-black uppercase tracking-widest ${agendarDia === 'amanha' ? 'text-white' : 'text-slate-400'
+                                            }`}
                                     >
                                         Amanha
                                     </Text>
@@ -264,9 +263,8 @@ export default function CheckinScreen() {
                                     return (
                                         <View
                                             key={aula.id}
-                                            className={`mb-4 rounded-3xl border border-slate-100 p-5 shadow-sm shadow-slate-200/50 ${
-                                                isAgendado ? 'bg-blue-50/30' : 'bg-white'
-                                            }`}
+                                            className={`mb-4 rounded-3xl border border-slate-100 p-5 shadow-sm shadow-slate-200/50 ${isAgendado ? 'bg-blue-50/30' : 'bg-white'
+                                                }`}
                                         >
                                             <View className="mb-4 flex-row items-center justify-between">
                                                 <View className="flex-row items-center">
@@ -279,22 +277,20 @@ export default function CheckinScreen() {
                                                 </View>
 
                                                 <View
-                                                    className={`rounded-md border px-2.5 py-1 ${
-                                                        isAgendado
+                                                    className={`rounded-md border px-2.5 py-1 ${isAgendado
                                                             ? 'border-blue-100 bg-blue-50'
                                                             : isFull
-                                                              ? 'border-slate-100 bg-slate-50'
-                                                              : 'border-emerald-100 bg-emerald-50'
-                                                    }`}
+                                                                ? 'border-slate-100 bg-slate-50'
+                                                                : 'border-emerald-100 bg-emerald-50'
+                                                        }`}
                                                 >
                                                     <Text
-                                                        className={`text-[10px] font-black uppercase tracking-widest ${
-                                                            isAgendado
+                                                        className={`text-[10px] font-black uppercase tracking-widest ${isAgendado
                                                                 ? 'text-blue-600'
                                                                 : isFull
-                                                                  ? 'text-slate-400'
-                                                                  : 'text-emerald-600'
-                                                        }`}
+                                                                    ? 'text-slate-400'
+                                                                    : 'text-emerald-600'
+                                                            }`}
                                                     >
                                                         {isAgendado ? 'AGENDADO' : isFull ? 'LOTADA' : 'LIVRE'}
                                                     </Text>
@@ -345,16 +341,14 @@ export default function CheckinScreen() {
                                                             activeOpacity={0.8}
                                                             disabled={isFull}
                                                             onPress={() => handleAgendar(aula.id)}
-                                                            className={`h-11 flex-row items-center justify-center rounded-xl px-8 shadow-sm ${
-                                                                isFull
+                                                            className={`h-11 flex-row items-center justify-center rounded-xl px-8 shadow-sm ${isFull
                                                                     ? 'bg-slate-100'
                                                                     : 'bg-[#111111] shadow-slate-900/30'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <Text
-                                                                className={`text-xs font-black uppercase tracking-widest ${
-                                                                    isFull ? 'text-slate-400' : 'text-white'
-                                                                }`}
+                                                                className={`text-xs font-black uppercase tracking-widest ${isFull ? 'text-slate-400' : 'text-white'
+                                                                    }`}
                                                             >
                                                                 AGENDAR
                                                             </Text>
