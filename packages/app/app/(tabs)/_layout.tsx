@@ -31,7 +31,9 @@ export default function TabLayout() {
                     fontSize: 0,
                 },
                 tabBarItemStyle: {
-                    paddingVertical: 8,
+                    paddingVertical: 0,
+                    justifyContent: 'center',
+                    alignItems: 'center',
                 },
             }}
         >

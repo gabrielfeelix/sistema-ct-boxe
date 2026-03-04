@@ -396,32 +396,42 @@ export default function HomeScreen() {
 
                 <View className="px-6 pt-8">
                     {proximaAula ? (
-                        <View className="relative mb-10 overflow-hidden rounded-[2.5rem] bg-[#0A0F1D] shadow-2xl shadow-slate-900/40">
+                        <View className="relative mb-10 overflow-hidden rounded-3xl bg-[#0A0F1D] shadow-2xl shadow-slate-900/40">
                             {/* Time Badge in Corner */}
-                            <View className="absolute right-0 top-0 h-16 w-24 items-center justify-center rounded-bl-[2.5rem] bg-[#CC0000]">
-                                <Text className="text-xl font-black text-white">{proximaAula.horario}</Text>
+                            <View className="absolute right-0 top-0 h-12 w-20 items-center justify-center rounded-bl-3xl bg-[#CC0000]">
+                                <Text className="text-lg font-black text-white">{proximaAula.horario}</Text>
                             </View>
 
-                            <View className="p-8 pt-10">
-                                <View className="mb-6 flex-row items-center">
-                                    <View className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
-                                        <Text className="text-[10px] font-black uppercase tracking-widest text-[#94A3B8]">
+                            <View className="p-6">
+                                <View className="mb-4 flex-row items-center gap-2">
+                                    <View className="rounded-lg bg-slate-800 px-2 py-1">
+                                        <Text className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                                             HOJE
                                         </Text>
                                     </View>
+                                    {(() => {
+                                        const hour = parseInt(proximaAula.horario.split(':')[0])
+                                        return hour >= 18 ? (
+                                            <View className="rounded-lg bg-slate-800 px-2 py-1">
+                                                <Text className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                    ADULTO
+                                                </Text>
+                                            </View>
+                                        ) : null
+                                    })()}
                                 </View>
 
-                                <Text className="mb-2 text-4xl font-black uppercase leading-tight tracking-tighter text-white">
-                                    {proximaAula.nome.split(' ').join('\n')}
+                                <Text className="mb-1 text-2xl font-black tracking-tight text-white">
+                                    AULA DE BOXE
                                 </Text>
 
-                                <View className="mb-8 flex-row items-center">
-                                    <Feather name="user" size={14} color="#CC0000" />
-                                    <Text className="ml-2 text-base font-bold text-slate-400">
+                                <View className="mb-5 flex-row items-center">
+                                    <Feather name="user" size={12} color="#CC0000" />
+                                    <Text className="ml-1.5 text-sm font-bold text-slate-400">
                                         {proximaAula.professor}
                                     </Text>
-                                    <View className="mx-3 h-1 w-1 rounded-full bg-slate-700" />
-                                    <Text className="text-xs font-black uppercase tracking-widest text-slate-500">
+                                    <View className="mx-2 h-1 w-1 rounded-full bg-slate-700" />
+                                    <Text className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                                         {proximaAula.vagas_ocupadas}/{proximaAula.vagas_total} ALUNOS
                                     </Text>
                                 </View>
@@ -430,20 +440,22 @@ export default function HomeScreen() {
                                     <TouchableOpacity
                                         activeOpacity={0.8}
                                         onPress={() => handleConfirmar(proximaAula.id)}
-                                        className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${isAulaConfirmada
-                                            ? 'border border-white/10 bg-white/5'
-                                            : 'bg-[#CC0000] shadow-red-900/30'
+                                        className={`h-12 flex-row items-center justify-center rounded-xl ${isAulaConfirmada
+                                            ? 'border border-white/10 bg-slate-800'
+                                            : 'bg-[#CC0000]'
                                             }`}
                                     >
-                                        <Text className="text-base font-black uppercase tracking-widest text-white">
-                                            {isAulaConfirmada ? 'CANCELAR PRESENCA' : 'CONFIRMAR PRESENÇA'}
+                                        <Text className="text-sm font-black uppercase tracking-widest text-white">
+                                            {isAulaConfirmada ? 'CANCELAR PRESENCA' : 'BATER O PONTO'}
                                         </Text>
-                                        <Feather
-                                            name={isAulaConfirmada ? 'x' : 'arrow-right'}
-                                            size={20}
-                                            color="white"
-                                            style={{ marginLeft: 12 }}
-                                        />
+                                        {!isAulaConfirmada && (
+                                            <Feather
+                                                name="x"
+                                                size={16}
+                                                color="white"
+                                                style={{ marginLeft: 8 }}
+                                            />
+                                        )}
                                     </TouchableOpacity>
                                 </Animated.View>
                             </View>
