@@ -1,6 +1,5 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 
-import * as FileSystem from 'expo-file-system'
 import { Alert } from 'react-native'
 import { daysUntil, getInitials, monthLabel, toBRDate, toBRDateTime, toBRTime } from '@/lib/formatters'
 import { supabase } from './supabase'
@@ -948,24 +947,17 @@ export async function updateAlunoDados(alunoId: string, payload: Partial<AlunoPr
     await supabase.from('alunos').update(cleanPayload).eq('id', alunoId)
 }
 
-function base64ToArrayBuffer(base64: string) {
-    const binaryString = atob(base64)
-    const len = binaryString.length
-    const bytes = new Uint8Array(len)
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
-    }
-    return bytes.buffer
-}
-
 export async function uploadFotoPerfil(alunoId: string, imageUri: string): Promise<string> {
-    const base64 = await FileSystem.readAsStringAsync(imageUri, { encoding: 'base64' })
-    const ext = imageUri.split('.').pop()
+    // Use fetch to read the file as blob (new recommended approach)
+    const response = await fetch(imageUri)
+    const blob = await response.blob()
+
+    const ext = imageUri.split('.').pop() || 'jpg'
     const filePath = `${alunoId}/${new Date().getTime()}.${ext}`
 
     const { error } = await supabase.storage
         .from('avatars')
-        .upload(filePath, base64ToArrayBuffer(base64), { contentType: `image/${ext}`, upsert: true })
+        .upload(filePath, blob, { contentType: `image/${ext}`, upsert: true })
 
     if (error) throw error
 

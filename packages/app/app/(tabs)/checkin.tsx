@@ -86,20 +86,28 @@ export default function CheckinScreen() {
     }, [aluno?.id, loadingAction, loadData])
 
     const handleCancelar = useCallback((aulaId: string) => {
-        if (!aluno?.id) return
+        if (!aluno?.id || loadingAction) return
         Alert.alert('Cancelar presença?', 'Tem certeza que deseja cancelar?', [
             { text: 'Não', style: 'cancel' },
             {
                 text: 'Sim, cancelar',
                 style: 'destructive',
                 onPress: async () => {
-                    await setPresencaStatus(aluno.id, aulaId, 'cancelada')
-                    await loadData()
-                    Alert.alert('Cancelado', 'Sua presença foi cancelada.')
+                    setLoadingAction(true)
+                    try {
+                        await setPresencaStatus(aluno.id, aulaId, 'cancelada')
+                        await loadData()
+                        Alert.alert('Cancelado', 'Sua presença foi cancelada.')
+                    } catch (error) {
+                        console.error('Erro ao cancelar:', error)
+                        Alert.alert('Erro', 'Não foi possível cancelar.')
+                    } finally {
+                        setLoadingAction(false)
+                    }
                 },
             },
         ])
-    }, [aluno?.id, loadData])
+    }, [aluno?.id, loadData, loadingAction])
 
     // Determinar quais aulas mostrar baseado no dia selecionado
     const listaAulas = selectedDayIndex === 0 ? data.hoje : selectedDayIndex === 1 ? data.amanha : []

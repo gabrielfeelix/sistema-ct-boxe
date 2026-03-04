@@ -102,8 +102,12 @@ export default function PerfilScreen() {
 
                 <View className="-mt-24 z-10 px-6">
                     <View className="mb-10 items-center">
-                        <View className="mb-6 h-32 w-32 items-center justify-center rounded-[2rem] border-4 border-[#FDFDFD] bg-white shadow-xl shadow-slate-900/10">
-                            <Text className="text-5xl font-black tracking-tighter text-slate-900">{avatarLabel}</Text>
+                        <View className="mb-6 h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-[#FDFDFD] bg-white shadow-xl shadow-slate-900/10">
+                            {alunoData?.foto_url ? (
+                                <Image source={{ uri: alunoData.foto_url }} className="h-full w-full" />
+                            ) : (
+                                <Text className="text-5xl font-black tracking-tighter text-slate-900">{avatarLabel}</Text>
+                            )}
                         </View>
                         <Text className="mb-3 text-3xl font-black tracking-tight text-slate-900">
                             {alunoData?.nome ?? 'Aluno'}
