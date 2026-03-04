@@ -307,98 +307,105 @@ export default function FeedScreen() {
             <Modal
                 visible={selectedEvent !== null}
                 animationType="slide"
-                presentationStyle="pageSheet"
+                transparent={true}
                 onRequestClose={() => setSelectedEvent(null)}
             >
-                <View className="flex-1 bg-white">
-                    <ScrollView showsVerticalScrollIndicator={false}>
-                        <View className="relative">
-                            <Image
-                                source={{ uri: selectedEvent === 'churras' ? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800' : 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=800', cache: 'force-cache' }}
-                                style={{ width: '100%', height: 300 }}
-                                resizeMode="cover"
-                            />
+                <View className="flex-1 justify-end bg-black/50">
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => setSelectedEvent(null)}
+                        className="flex-1"
+                    />
+                    <View className="max-h-[85%] overflow-hidden rounded-t-3xl bg-white">
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View className="relative">
+                                <Image
+                                    source={{ uri: selectedEvent === 'churras' ? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800' : 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=800', cache: 'force-cache' }}
+                                    style={{ width: '100%', height: 300 }}
+                                    resizeMode="cover"
+                                />
 
-                            <TouchableOpacity
-                                onPress={() => setSelectedEvent(null)}
-                                className="absolute right-4 top-12 h-10 w-10 items-center justify-center rounded-full bg-black/50"
-                            >
-                                <Feather name="x" size={24} color="#FFFFFF" />
-                            </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => setSelectedEvent(null)}
+                                    className="absolute right-4 top-4 h-10 w-10 items-center justify-center rounded-full bg-black/50"
+                                >
+                                    <Feather name="x" size={24} color="#FFFFFF" />
+                                </TouchableOpacity>
 
-                            <View className="absolute bottom-4 left-4 rounded-xl bg-[#CC0000] px-3 py-2">
-                                <Text className="text-xs font-black uppercase tracking-widest text-white">
-                                    {selectedEvent === 'churras' ? 'SÁB. 20/11' : 'DOM. 28/11'}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View className="px-6 py-6">
-                            <View className="mb-4 rounded-lg bg-amber-50 px-3 py-1.5 self-start">
-                                <Text className="text-[10px] font-black uppercase tracking-widest text-amber-700">
-                                    {selectedEvent === 'churras' ? 'SOCIAL' : 'TREINO'}
-                                </Text>
-                            </View>
-
-                            <Text className="mb-6 text-3xl font-black tracking-tight text-slate-900">
-                                {selectedEvent === 'churras' ? 'CHURRAS DOS ALUNOS' : 'AULÃO DE SPARRING'}
-                            </Text>
-
-                            <View className="mb-3 flex-row items-center">
-                                <View className="mr-2 h-10 w-10 items-center justify-center rounded-full bg-red-50">
-                                    <Feather name="clock" size={18} color="#CC0000" />
+                                <View className="absolute bottom-4 left-4 rounded-xl bg-[#CC0000] px-3 py-2">
+                                    <Text className="text-xs font-black uppercase tracking-widest text-white">
+                                        {selectedEvent === 'churras' ? 'SÁB. 20/11' : 'DOM. 28/11'}
+                                    </Text>
                                 </View>
-                                <Text className="text-base font-bold text-slate-900">
-                                    {selectedEvent === 'churras' ? '14:00' : '09:00'}
-                                </Text>
                             </View>
 
-                            <View className="mb-8 flex-row items-center">
-                                <View className="mr-2 h-10 w-10 items-center justify-center rounded-full bg-red-50">
-                                    <Feather name="map-pin" size={18} color="#CC0000" />
+                            <View className="px-6 py-6">
+                                <View className="mb-4 rounded-lg bg-amber-50 px-3 py-1.5 self-start">
+                                    <Text className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                                        {selectedEvent === 'churras' ? 'SOCIAL' : 'TREINO'}
+                                    </Text>
                                 </View>
-                                <Text className="text-base font-bold text-slate-900">
-                                    Área de Lazer do CT
+
+                                <Text className="mb-6 text-3xl font-black tracking-tight text-slate-900">
+                                    {selectedEvent === 'churras' ? 'CHURRAS DOS ALUNOS' : 'AULÃO DE SPARRING'}
                                 </Text>
-                            </View>
 
-                            <Text className="mb-3 text-sm font-bold uppercase tracking-widest text-slate-500">
-                                SOBRE O EVENTO
-                            </Text>
-                            <Text className="mb-8 text-[15px] font-medium leading-relaxed text-slate-600">
-                                {selectedEvent === 'churras'
-                                    ? 'Comemoração dos exames de graduação. Cerveja, carne e resenha liberada!'
-                                    : 'Aulão especial de sparring com rounds de 3 minutos. Venha testar suas habilidades!'}
-                            </Text>
-
-                            <View className="mb-8 flex-row items-center">
-                                <View className="flex-row">
-                                    <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-800">
-                                        <Text className="text-xs font-black text-white">AB</Text>
+                                <View className="mb-3 flex-row items-center">
+                                    <View className="mr-2 h-10 w-10 items-center justify-center rounded-full bg-red-50">
+                                        <Feather name="clock" size={18} color="#CC0000" />
                                     </View>
-                                    <View className="-ml-2 h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-700">
-                                        <Text className="text-xs font-black text-white">CD</Text>
-                                    </View>
-                                    <View className="-ml-2 h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-600">
-                                        <Text className="text-xs font-black text-white">EF</Text>
-                                    </View>
-                                    <View className="-ml-2 h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-500">
-                                        <Text className="text-xs font-black text-white">+24</Text>
-                                    </View>
+                                    <Text className="text-base font-bold text-slate-900">
+                                        {selectedEvent === 'churras' ? '14:00' : '09:00'}
+                                    </Text>
                                 </View>
-                                <Text className="ml-3 text-sm font-bold text-slate-500">Confirmados</Text>
-                            </View>
 
-                            <TouchableOpacity
-                                activeOpacity={0.8}
-                                className="h-14 items-center justify-center rounded-2xl bg-[#CC0000] shadow-lg shadow-red-900/30"
-                            >
-                                <Text className="text-base font-black uppercase tracking-widest text-white">
-                                    CONFIRMAR PRESENÇA
+                                <View className="mb-8 flex-row items-center">
+                                    <View className="mr-2 h-10 w-10 items-center justify-center rounded-full bg-red-50">
+                                        <Feather name="map-pin" size={18} color="#CC0000" />
+                                    </View>
+                                    <Text className="text-base font-bold text-slate-900">
+                                        Área de Lazer do CT
+                                    </Text>
+                                </View>
+
+                                <Text className="mb-3 text-sm font-bold uppercase tracking-widest text-slate-500">
+                                    SOBRE O EVENTO
                                 </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </ScrollView>
+                                <Text className="mb-8 text-[15px] font-medium leading-relaxed text-slate-600">
+                                    {selectedEvent === 'churras'
+                                        ? 'Comemoração dos exames de graduação. Cerveja, carne e resenha liberada!'
+                                        : 'Aulão especial de sparring com rounds de 3 minutos. Venha testar suas habilidades!'}
+                                </Text>
+
+                                <View className="mb-8 flex-row items-center">
+                                    <View className="flex-row">
+                                        <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-800">
+                                            <Text className="text-xs font-black text-white">AB</Text>
+                                        </View>
+                                        <View className="-ml-2 h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-700">
+                                            <Text className="text-xs font-black text-white">CD</Text>
+                                        </View>
+                                        <View className="-ml-2 h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-600">
+                                            <Text className="text-xs font-black text-white">EF</Text>
+                                        </View>
+                                        <View className="-ml-2 h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-500">
+                                            <Text className="text-xs font-black text-white">+24</Text>
+                                        </View>
+                                    </View>
+                                    <Text className="ml-3 text-sm font-bold text-slate-500">Confirmados</Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    className="h-14 items-center justify-center rounded-2xl bg-[#CC0000] shadow-lg shadow-red-900/30"
+                                >
+                                    <Text className="text-base font-black uppercase tracking-widest text-white">
+                                        CONFIRMAR PRESENÇA
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
                 </View>
             </Modal>
         </View>
