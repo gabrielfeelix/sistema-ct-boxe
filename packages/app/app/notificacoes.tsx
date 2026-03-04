@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useState, Fragment } from 'react'
 import { Alert, FlatList, Linking, RefreshControl, Text, TouchableOpacity, View } from 'react-native'
 
+import { NotificationSkeleton } from '@/components/SkeletonLoader'
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchNotificacoes, markAllNotificacoesLidas, markNotificacaoLida } from '@/lib/appData'
 import type { HomeNotification } from '@/lib/types'
@@ -136,8 +137,11 @@ export default function NotificacoesScreen() {
                 windowSize={5}
                 ListEmptyComponent={
                     loading ? (
-                        <View className="px-6 py-16">
-                            <Text className="text-center text-sm text-slate-500">Carregando notificacoes...</Text>
+                        <View>
+                            <NotificationSkeleton />
+                            <NotificationSkeleton />
+                            <NotificationSkeleton />
+                            <NotificationSkeleton />
                         </View>
                     ) : (
                         <View className="items-center justify-center px-6 py-20">

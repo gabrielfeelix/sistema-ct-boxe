@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Animated, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
+import { AulaSkeleton } from '@/components/SkeletonLoader'
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchCheckinData, type CheckinData, setPresencaStatus } from '@/lib/appData'
 
@@ -95,7 +96,11 @@ export default function CheckinScreen() {
 
     const listaAgendamento = agendarDia === 'hoje' ? data.hoje : data.amanha
     const proximaAula = data.proximaAula
-    const isConfirmado = Boolean(proximaAula?.presente)
+    const isConfirmado = Boolean(proximaAula?.presente) || Boolean(proximaAula?.agendado)
+
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const isHoje = agendarDia === 'hoje'
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
@@ -121,8 +126,8 @@ export default function CheckinScreen() {
                         activeOpacity={0.8}
                         onPress={() => setTabAtiva('agendar')}
                         className={`flex-1 items-center rounded-xl py-3 ${tabAtiva === 'agendar'
-                                ? 'border border-slate-100 bg-white shadow-sm shadow-slate-200'
-                                : ''
+                            ? 'border border-slate-100 bg-white shadow-sm shadow-slate-200'
+                            : ''
                             }`}
                     >
                         <Text
@@ -142,7 +147,8 @@ export default function CheckinScreen() {
             >
                 {loadingData ? (
                     <View className="px-6 py-16">
-                        <Text className="text-center text-sm text-slate-500">Carregando aulas...</Text>
+                        <AulaSkeleton />
+                        <AulaSkeleton />
                     </View>
                 ) : tabAtiva === 'hoje' ? (
                     <View className="px-6">
@@ -181,25 +187,25 @@ export default function CheckinScreen() {
 
                                 <TouchableOpacity
                                     activeOpacity={0.8}
-                                    onPress={() => handleCheckin(proximaAula.id)}
-                                    disabled={isConfirmado || loadingAction}
+                                    onPress={() => isConfirmado ? handleCancelarAgendamento(proximaAula.id) : handleCheckin(proximaAula.id)}
+                                    disabled={loadingAction}
                                     className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${isConfirmado
-                                            ? 'bg-emerald-500 shadow-emerald-500/30'
-                                            : 'bg-[#CC0000] shadow-red-900/40'
+                                        ? 'bg-slate-100 shadow-slate-200/50 border border-slate-200'
+                                        : 'bg-[#CC0000] shadow-red-900/40'
                                         }`}
                                     style={{ opacity: loadingAction ? 0.7 : 1 }}
                                 >
                                     <Feather
-                                        name={isConfirmado ? 'check' : 'target'}
+                                        name={isConfirmado ? 'x' : 'target'}
                                         size={20}
-                                        color="white"
+                                        color={isConfirmado ? '#64748B' : 'white'}
                                         style={{ marginRight: 12 }}
                                     />
-                                    <Text className="text-base font-black uppercase tracking-widest text-white">
+                                    <Text className={`text-base font-black uppercase tracking-widest ${isConfirmado ? 'text-slate-500' : 'text-white'}`}>
                                         {loadingAction
                                             ? 'PROCESSANDO...'
                                             : isConfirmado
-                                                ? 'PRESENCA CONFIRMADA'
+                                                ? 'CANCELAR CHECK-IN'
                                                 : 'FAZER CHECK-IN AGORA'}
                                     </Text>
                                 </TouchableOpacity>
@@ -256,7 +262,10 @@ export default function CheckinScreen() {
                                 listaAgendamento.map((aula) => {
                                     const isAgendado = Boolean(aula.agendado || aula.presente)
                                     const isFull = aula.vagas_ocupadas >= aula.vagas_total && !isAgendado
-                                    const buttonScale = animValues[aula.id] || new Animated.Value(1)
+                                    const buttonScale = animValuesRef.current[aula.id] || new Animated.Value(1)
+
+                                    const classMinutes = Number(aula.horario.split(':')[0]) * 60 + Number(aula.horario.split(':')[1]);
+                                    const isPassed = isHoje && classMinutes < currentMinutes;
 
                                     return (
                                         <View
@@ -275,7 +284,9 @@ export default function CheckinScreen() {
                                                 </View>
 
                                                 <View
-                                                    className={`rounded-md border px-2.5 py-1 ${isAgendado
+                                                    className={`rounded-md border px-2.5 py-1 ${isPassed
+                                                        ? 'border-slate-100 bg-slate-50'
+                                                        : isAgendado
                                                             ? 'border-blue-100 bg-blue-50'
                                                             : isFull
                                                                 ? 'border-slate-100 bg-slate-50'
@@ -283,14 +294,16 @@ export default function CheckinScreen() {
                                                         }`}
                                                 >
                                                     <Text
-                                                        className={`text-[10px] font-black uppercase tracking-widest ${isAgendado
+                                                        className={`text-[10px] font-black uppercase tracking-widest ${isPassed
+                                                            ? 'text-slate-500'
+                                                            : isAgendado
                                                                 ? 'text-blue-600'
                                                                 : isFull
                                                                     ? 'text-slate-400'
                                                                     : 'text-emerald-600'
                                                             }`}
                                                     >
-                                                        {isAgendado ? 'AGENDADO' : isFull ? 'LOTADA' : 'LIVRE'}
+                                                        {isPassed ? 'ENCERRADA' : isAgendado ? 'AGENDADO' : isFull ? 'LOTADA' : 'LIVRE'}
                                                     </Text>
                                                 </View>
                                             </View>
@@ -301,58 +314,52 @@ export default function CheckinScreen() {
                                             >
                                                 {aula.nome}
                                             </Text>
-                                            <Text className="mb-6 text-xs font-medium text-slate-500">
+                                            <Text className="text-sm font-medium text-slate-500">
                                                 {aula.professor}
                                             </Text>
 
-                                            <View className="flex-row items-center justify-between">
-                                                <View>
-                                                    <Text className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                        CAPACIDADE
-                                                    </Text>
-                                                    <Text className="text-sm font-bold text-slate-700">
-                                                        {aula.vagas_ocupadas} / {aula.vagas_total} vagas
+                                            <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4">
+                                                <View className="flex-row items-center">
+                                                    <View className="mr-2 h-2 w-2 rounded-full bg-slate-300" />
+                                                    <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                                                        {aula.vagas_ocupadas}/{aula.vagas_total} VAGAS LIGADAS
                                                     </Text>
                                                 </View>
 
-                                                {isAgendado ? (
-                                                    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                                                        <TouchableOpacity
-                                                            activeOpacity={0.6}
-                                                            onPress={() => handleCancelarAgendamento(aula.id)}
-                                                            className="h-11 flex-row items-center justify-center rounded-xl border-2 border-slate-200 bg-white px-6 shadow-sm shadow-slate-200/50"
-                                                        >
-                                                            <Feather
-                                                                name="x"
-                                                                size={14}
-                                                                color="#64748B"
-                                                                style={{ marginRight: 6 }}
-                                                            />
-                                                            <Text className="text-xs font-black uppercase tracking-widest text-slate-600">
-                                                                Cancelar
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    </Animated.View>
-                                                ) : (
-                                                    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                                                        <TouchableOpacity
-                                                            activeOpacity={0.8}
-                                                            disabled={isFull}
-                                                            onPress={() => handleAgendar(aula.id)}
-                                                            className={`h-11 flex-row items-center justify-center rounded-xl px-8 shadow-sm ${isFull
+                                                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                                                    <TouchableOpacity
+                                                        activeOpacity={0.8}
+                                                        onPress={() => isAgendado ? handleCancelarAgendamento(aula.id) : handleAgendar(aula.id)}
+                                                        disabled={isPassed || (!isAgendado && isFull)}
+                                                        className={`h-12 flex-row items-center justify-center rounded-xl px-5 shadow-sm ${isPassed
+                                                            ? 'bg-slate-50'
+                                                            : isAgendado
+                                                                ? 'bg-blue-100 border border-blue-200'
+                                                                : isFull
                                                                     ? 'bg-slate-100'
-                                                                    : 'bg-[#111111] shadow-slate-900/30'
+                                                                    : 'bg-[#0F172A]'
+                                                            }`}
+                                                    >
+                                                        <Text
+                                                            className={`text-xs font-black uppercase tracking-widest ${isPassed
+                                                                ? 'text-slate-400'
+                                                                : isAgendado
+                                                                    ? 'text-blue-600'
+                                                                    : isFull
+                                                                        ? 'text-slate-400'
+                                                                        : 'text-white'
                                                                 }`}
                                                         >
-                                                            <Text
-                                                                className={`text-xs font-black uppercase tracking-widest ${isFull ? 'text-slate-400' : 'text-white'
-                                                                    }`}
-                                                            >
-                                                                AGENDAR
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    </Animated.View>
-                                                )}
+                                                            {isPassed
+                                                                ? 'INDISPONIVEL'
+                                                                : isAgendado
+                                                                    ? 'CANCELAR'
+                                                                    : isFull
+                                                                        ? 'ESGOTADO'
+                                                                        : 'AGENDAR AULA'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </Animated.View>
                                             </View>
                                         </View>
                                     )
@@ -365,4 +372,3 @@ export default function CheckinScreen() {
         </View>
     )
 }
-

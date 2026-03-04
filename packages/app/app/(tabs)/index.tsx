@@ -1,6 +1,6 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
     Alert,
     Animated,
@@ -13,11 +13,13 @@ import {
     View,
     Image,
 } from 'react-native'
+import { useFocusEffect } from 'expo-router'
 
 import StoryViewer from '@/components/StoryViewer'
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchHomeData, type HomeData, setPresencaStatus } from '@/lib/appData'
+import { fetchHomeData, type HomeData, type HomeAviso, setPresencaStatus } from '@/lib/appData'
 import { getInitials } from '@/lib/formatters'
+import type { AppAula } from '@/lib/types'
 
 function buildEmptyHomeData(): HomeData {
     return {
@@ -28,6 +30,145 @@ function buildEmptyHomeData(): HomeData {
         proximaAula: null,
     }
 }
+
+const AvisoItem = memo(({ aviso, isExpanded, onToggle }: {
+    aviso: HomeAviso
+    isExpanded: boolean
+    onToggle: (id: string) => void
+}) => (
+    <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => onToggle(aviso.id)}
+        className="mb-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
+    >
+        <View className="flex-row items-start justify-between">
+            <View className="mr-4 flex-1">
+                <View className="mb-2 flex-row items-center">
+                    <View className="mr-2 h-1.5 w-1.5 rounded-full bg-[#CC0000]" />
+                    <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        {aviso.data}
+                    </Text>
+                </View>
+                <Text className="text-base font-bold tracking-tight text-slate-900">
+                    {aviso.titulo}
+                </Text>
+                {isExpanded && (
+                    <Text className="mt-3 text-sm leading-relaxed text-slate-500">
+                        {aviso.texto}
+                    </Text>
+                )}
+            </View>
+            <View className="mt-1 h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                <Feather
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color="#64748B"
+                />
+            </View>
+        </View>
+    </TouchableOpacity>
+))
+
+const AulaHojeItem = memo(({ aula, onPress, onAgendarOuCancelar, currentMinutes }: {
+    aula: AppAula
+    onPress: (id: string) => void
+    onAgendarOuCancelar: (id: string, isConfirmado: boolean) => void
+    currentMinutes: number
+}) => {
+    const isLivre = aula.vagas_ocupadas < aula.vagas_total
+    const isConfirmado = Boolean(aula.presente || aula.agendado)
+    const classMinutes = Number(aula.horario.split(':')[0]) * 60 + Number(aula.horario.split(':')[1])
+    const isPassed = classMinutes < currentMinutes
+
+    return (
+        <View
+            className="mr-4 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
+            style={{ width: 280 }}
+        >
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => onPress(aula.id)}
+            >
+                <View className="mb-4 flex-row items-start justify-between">
+                    <Text className="text-2xl font-black tracking-tighter text-slate-900">
+                        {aula.horario}
+                    </Text>
+                    <View
+                        className={`rounded-md px-2 py-1 ${isPassed
+                            ? 'bg-slate-100'
+                            : isLivre
+                                ? 'bg-emerald-50'
+                                : 'bg-slate-100'
+                            }`}
+                    >
+                        <Text
+                            className={`text-[10px] font-black uppercase tracking-widest ${isPassed
+                                ? 'text-slate-500'
+                                : isLivre
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-500'
+                                }`}
+                        >
+                            {isPassed ? 'ENCERRADA' : isLivre ? 'LIVRE' : 'LOTADA'}
+                        </Text>
+                    </View>
+                </View>
+
+                <Text
+                    className="mb-1 text-lg font-bold tracking-tight text-slate-900"
+                    numberOfLines={1}
+                >
+                    {aula.nome}
+                </Text>
+                <Text className="mb-6 text-sm font-medium text-slate-500">
+                    {aula.professor}
+                </Text>
+            </TouchableOpacity>
+
+            <View className="mb-4 flex-row items-center justify-between border-t border-slate-100/50 pt-4">
+                <Text className="text-xs font-bold text-slate-400">
+                    Confirmados: {aula.vagas_ocupadas}
+                </Text>
+                <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    {aula.vagas_ocupadas}/{aula.vagas_total}
+                </Text>
+            </View>
+
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => onAgendarOuCancelar(aula.id, isConfirmado)}
+                disabled={isPassed || (!isConfirmado && !isLivre)}
+                className={`h-10 flex-row items-center justify-center rounded-xl px-4 ${isPassed
+                    ? 'bg-slate-50 border border-slate-100'
+                    : isConfirmado
+                        ? 'bg-slate-100 border border-slate-200'
+                        : !isLivre
+                            ? 'bg-slate-100'
+                            : 'border border-red-100 bg-red-50'
+                    }`}
+            >
+                <Text
+                    className={`text-[10px] font-black uppercase tracking-widest ${isPassed
+                        ? 'text-slate-400'
+                        : isConfirmado
+                            ? 'text-slate-500'
+                            : !isLivre
+                                ? 'text-slate-400'
+                                : 'text-[#CC0000]'
+                        }`}
+                >
+                    {isPassed
+                        ? 'NAO DISPONIVEL'
+                        : isConfirmado
+                            ? 'CANCELAR AGENDAMENTO'
+                            : !isLivre
+                                ? 'ESGOTADO'
+                                : 'AGENDAR PRESENCA'}
+                </Text>
+            </TouchableOpacity>
+        </View>
+    )
+})
 
 export default function HomeScreen() {
     const router = useRouter()
@@ -48,9 +189,11 @@ export default function HomeScreen() {
         setLoading(false)
     }, [aluno?.id])
 
-    useEffect(() => {
-        loadData()
-    }, [loadData])
+    useFocusEffect(
+        useCallback(() => {
+            loadData()
+        }, [loadData])
+    )
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true)
@@ -70,14 +213,26 @@ export default function HomeScreen() {
             Animated.timing(heroScale, { toValue: 1, duration: 150, useNativeDriver: true }),
         ]).start()
 
-        await setPresencaStatus(aluno.id, aulaId, 'presente')
-        await loadData()
-        Alert.alert('Presenca confirmada', 'Seu check-in foi registrado com sucesso.')
+        const isAulaConfirmada = Boolean(homeData.proximaAula?.presente) || Boolean(homeData.proximaAula?.agendado)
+
+        if (isAulaConfirmada) {
+            await setPresencaStatus(aluno.id, aulaId, 'cancelada')
+            await loadData()
+            Alert.alert('Cancelado', 'Sua presenca foi cancelada.')
+        } else {
+            await setPresencaStatus(aluno.id, aulaId, 'presente')
+            await loadData()
+            Alert.alert('Presenca confirmada', 'Seu check-in foi registrado com sucesso.')
+        }
     }
 
-    const handleAgendar = async (aulaId: string) => {
+    const handleAgendarOuCancelar = async (aulaId: string, isConfirmado: boolean) => {
         if (!aluno?.id) return
-        await setPresencaStatus(aluno.id, aulaId, 'agendado')
+        if (isConfirmado) {
+            await setPresencaStatus(aluno.id, aulaId, 'cancelada')
+        } else {
+            await setPresencaStatus(aluno.id, aulaId, 'agendado')
+        }
         await loadData()
     }
 
@@ -94,8 +249,15 @@ export default function HomeScreen() {
         Linking.openURL(url).catch(() => Alert.alert('Ops', 'Nao foi possivel abrir o link.'))
     }
 
+    const handleAulaPress = useCallback((id: string) => {
+        router.push(`/aula/${id}`)
+    }, [router])
+
     const proximaAula = homeData.proximaAula
-    const isAulaConfirmada = Boolean(proximaAula?.presente)
+    const isAulaConfirmada = Boolean(proximaAula?.presente) || Boolean(proximaAula?.agendado)
+
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
@@ -222,17 +384,17 @@ export default function HomeScreen() {
                                         activeOpacity={0.8}
                                         onPress={() => handleConfirmar(proximaAula.id)}
                                         className={`h-14 flex-row items-center justify-center rounded-2xl shadow-md ${isAulaConfirmada
-                                                ? 'bg-emerald-500 shadow-emerald-900/30'
-                                                : 'bg-[#CC0000] shadow-red-900/30'
+                                            ? 'bg-slate-100 shadow-slate-200/50 border border-slate-200'
+                                            : 'bg-[#CC0000] shadow-red-900/30'
                                             }`}
                                     >
-                                        <Text className="text-base font-bold tracking-wide text-white">
-                                            {isAulaConfirmada ? 'PRESENCA CONFIRMADA' : 'CONFIRMAR PRESENCA'}
+                                        <Text className={`text-base font-bold tracking-wide ${isAulaConfirmada ? 'text-slate-500' : 'text-white'}`}>
+                                            {isAulaConfirmada ? 'CANCELAR PRESENCA' : 'CONFIRMAR PRESENCA'}
                                         </Text>
                                         <Feather
-                                            name={isAulaConfirmada ? 'check' : 'arrow-right'}
+                                            name={isAulaConfirmada ? 'x' : 'arrow-right'}
                                             size={18}
-                                            color="white"
+                                            color={isAulaConfirmada ? '#64748B' : 'white'}
                                             style={{ marginLeft: 8 }}
                                         />
                                     </TouchableOpacity>
@@ -259,85 +421,15 @@ export default function HomeScreen() {
                             className="-mx-6 px-6"
                             contentContainerStyle={{ paddingRight: 40 }}
                         >
-                            {homeData.aulasHoje.map((aula) => {
-                                const isLivre = aula.vagas_ocupadas < aula.vagas_total
-                                const isConfirmado = Boolean(aula.presente || aula.agendado)
-
-                                return (
-                                    <View
-                                        key={aula.id}
-                                        className="mr-4 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
-                                        style={{ width: 280 }}
-                                    >
-                                        <TouchableOpacity
-                                            activeOpacity={0.7}
-                                            onPress={() => router.push(`/aula/${aula.id}`)}
-                                        >
-                                            <View className="mb-4 flex-row items-start justify-between">
-                                                <Text className="text-2xl font-black tracking-tighter text-slate-900">
-                                                    {aula.horario}
-                                                </Text>
-                                                <View
-                                                    className={`rounded-md px-2 py-1 ${isLivre ? 'bg-emerald-50' : 'bg-slate-100'
-                                                        }`}
-                                                >
-                                                    <Text
-                                                        className={`text-[10px] font-black uppercase tracking-widest ${isLivre ? 'text-emerald-600' : 'text-slate-500'
-                                                            }`}
-                                                    >
-                                                        {isLivre ? 'LIVRE' : 'LOTADA'}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <Text
-                                                className="mb-1 text-lg font-bold tracking-tight text-slate-900"
-                                                numberOfLines={1}
-                                            >
-                                                {aula.nome}
-                                            </Text>
-                                            <Text className="mb-6 text-sm font-medium text-slate-500">
-                                                {aula.professor}
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        <View className="mb-4 flex-row items-center justify-between border-t border-slate-100/50 pt-4">
-                                            <Text className="text-xs font-bold text-slate-400">
-                                                Confirmados: {aula.vagas_ocupadas}
-                                            </Text>
-                                            <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                {aula.vagas_ocupadas}/{aula.vagas_total}
-                                            </Text>
-                                        </View>
-
-                                        <TouchableOpacity
-                                            activeOpacity={0.8}
-                                            onPress={() => !isConfirmado && isLivre && handleAgendar(aula.id)}
-                                            className={`h-10 flex-row items-center justify-center rounded-xl px-4 ${isConfirmado
-                                                    ? 'bg-emerald-500'
-                                                    : !isLivre
-                                                        ? 'bg-slate-100'
-                                                        : 'border border-red-100 bg-red-50'
-                                                }`}
-                                        >
-                                            <Text
-                                                className={`text-[10px] font-black uppercase tracking-widest ${isConfirmado
-                                                        ? 'text-white'
-                                                        : !isLivre
-                                                            ? 'text-slate-400'
-                                                            : 'text-[#CC0000]'
-                                                    }`}
-                                            >
-                                                {isConfirmado
-                                                    ? 'PRESENCA REGISTRADA'
-                                                    : !isLivre
-                                                        ? 'ESGOTADO'
-                                                        : 'AGENDAR PRESENCA'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )
-                            })}
+                            {homeData.aulasHoje.map((aula) => (
+                                <AulaHojeItem
+                                    key={aula.id}
+                                    aula={aula}
+                                    onPress={handleAulaPress}
+                                    onAgendarOuCancelar={handleAgendarOuCancelar}
+                                    currentMinutes={currentMinutes}
+                                />
+                            ))}
                         </ScrollView>
                     </View>
 
@@ -348,43 +440,14 @@ export default function HomeScreen() {
                                 <Text className="text-sm text-slate-500">Nenhum aviso publicado no momento.</Text>
                             </View>
                         ) : (
-                            homeData.avisos.map((aviso) => {
-                                const isExpanded = expandedAvisoId === aviso.id
-                                return (
-                                    <TouchableOpacity
-                                        activeOpacity={0.7}
-                                        key={aviso.id}
-                                        onPress={() => toggleAviso(aviso.id)}
-                                        className="mb-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
-                                    >
-                                        <View className="flex-row items-start justify-between">
-                                            <View className="mr-4 flex-1">
-                                                <View className="mb-2 flex-row items-center">
-                                                    <View className="mr-2 h-1.5 w-1.5 rounded-full bg-[#CC0000]" />
-                                                    <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                                                        {aviso.data}
-                                                    </Text>
-                                                </View>
-                                                <Text className="text-base font-bold tracking-tight text-slate-900">
-                                                    {aviso.titulo}
-                                                </Text>
-                                                {isExpanded && (
-                                                    <Text className="mt-3 text-sm leading-relaxed text-slate-500">
-                                                        {aviso.texto}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                            <View className="mt-1 h-8 w-8 items-center justify-center rounded-full bg-slate-50">
-                                                <Feather
-                                                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                                                    size={16}
-                                                    color="#64748B"
-                                                />
-                                            </View>
-                                        </View>
-                                    </TouchableOpacity>
-                                )
-                            })
+                            homeData.avisos.map((aviso) => (
+                                <AvisoItem
+                                    key={aviso.id}
+                                    aviso={aviso}
+                                    isExpanded={expandedAvisoId === aviso.id}
+                                    onToggle={toggleAviso}
+                                />
+                            ))
                         )}
                     </View>
 

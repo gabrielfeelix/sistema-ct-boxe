@@ -14,7 +14,7 @@ import type {
     HomeStory,
 } from '@/lib/types'
 
-interface HomeAviso {
+export interface HomeAviso {
     id: string
     titulo: string
     data: string

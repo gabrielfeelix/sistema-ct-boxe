@@ -5,6 +5,7 @@ import { Stack, usePathname, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Alert, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { toBRDate, toCurrencyBRL } from '@/lib/formatters'
@@ -13,7 +14,7 @@ import { useContratoStatus } from '@/hooks/useContratoStatus'
 function AppLayoutShell() {
     const pathname = usePathname()
     const router = useRouter()
-    const { session, aluno, loading } = useAuth()
+    const { session, aluno, loading, signOut } = useAuth()
     const { status: contrato } = useContratoStatus(aluno?.id)
     const [showBanner, setShowBanner] = useState(true)
 
@@ -27,10 +28,19 @@ function AppLayoutShell() {
             return
         }
 
-        if (session && inAuthRoute) {
+        if (session && !aluno) {
+            // O usuario nao e aluno (provavelmente Admin testando no Web / mesmo localhost)
+            // Forçamos o logout para limpar a sessão no aplicativo Auth e exibir login falso
+            signOut().then(() => {
+                if (!inAuthRoute) router.replace('/auth/login')
+            })
+            return
+        }
+
+        if (session && aluno && inAuthRoute) {
             router.replace('/(tabs)')
         }
-    }, [loading, pathname, router, session])
+    }, [loading, pathname, router, session, aluno, signOut])
 
     const isVencendo = contrato.status === 'vencendo'
     const isBloqueado = contrato.status === 'vencido'
@@ -188,9 +198,11 @@ function AppLayoutShell() {
 
 export default function RootLayout() {
     return (
-        <AuthProvider>
-            <AppLayoutShell />
-        </AuthProvider>
+        <ErrorBoundary>
+            <AuthProvider>
+                <AppLayoutShell />
+            </AuthProvider>
+        </ErrorBoundary>
     )
 }
 

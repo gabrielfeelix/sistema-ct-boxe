@@ -1,8 +1,9 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { memo, useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'expo-router'
-import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View, Image } from 'react-native'
+import { FlatList, RefreshControl, Text, TouchableOpacity, View, Image } from 'react-native'
 
+import { FeedPostSkeleton } from '@/components/SkeletonLoader'
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchFeedData, toggleFeedLike } from '@/lib/appData'
 import type { FeedPost } from '@/lib/types'
@@ -179,33 +180,37 @@ export default function FeedScreen() {
                 <Text className="text-4xl font-black tracking-tight text-slate-900">Feed</Text>
             </View>
 
-            <ScrollView
+            <FlatList
+                data={loading ? [] : posts}
+                keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={{ paddingTop: 24, paddingBottom: 100 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            >
-                {loading ? (
-                    <View className="px-6 py-16">
-                        <Text className="text-center text-sm text-slate-500">Carregando posts...</Text>
-                    </View>
-                ) : posts.length === 0 ? (
-                    <View className="px-6 py-20 items-center">
-                        <Feather name="inbox" size={48} color="#CBD5E1" />
-                        <Text className="mt-4 text-slate-500">Nenhum post publicado.</Text>
-                    </View>
-                ) : (
-                    <View className="pt-6">
-                        {posts.map((post) => (
-                            <FeedPostItem
-                                key={post.id}
-                                post={post}
-                                onLike={handleLike}
-                                onComment={handleComment}
-                            />
-                        ))}
-                    </View>
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={5}
+                windowSize={3}
+                ListEmptyComponent={
+                    loading ? (
+                        <View>
+                            <FeedPostSkeleton />
+                            <FeedPostSkeleton />
+                            <FeedPostSkeleton />
+                        </View>
+                    ) : (
+                        <View className="px-6 py-20 items-center">
+                            <Feather name="inbox" size={48} color="#CBD5E1" />
+                            <Text className="mt-4 text-slate-500">Nenhum post publicado.</Text>
+                        </View>
+                    )
+                }
+                renderItem={({ item: post }) => (
+                    <FeedPostItem
+                        post={post}
+                        onLike={handleLike}
+                        onComment={handleComment}
+                    />
                 )}
-            </ScrollView>
+            />
         </View>
     )
 }
