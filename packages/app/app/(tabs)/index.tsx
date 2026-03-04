@@ -77,8 +77,11 @@ const AulaHojeItem = memo(({ aula, onPress, onAgendarOuCancelar, currentMinutes 
 }) => {
     const isLivre = aula.vagas_ocupadas < aula.vagas_total
     const isConfirmado = Boolean(aula.presente || aula.agendado)
+
+    // Verificar se a aula passou (considerar data + hora)
+    const today = new Date().toISOString().slice(0, 10)
     const classMinutes = Number(aula.horario.split(':')[0]) * 60 + Number(aula.horario.split(':')[1])
-    const isPassed = classMinutes < currentMinutes
+    const isPassed = aula.data < today || (aula.data === today && classMinutes < currentMinutes)
 
     return (
         <View
@@ -484,16 +487,7 @@ export default function HomeScreen() {
                             className="-mx-6 px-6"
                             contentContainerStyle={{ paddingRight: 40 }}
                         >
-                            {homeData.aulasHoje
-                                .filter((aula) => {
-                                    // Calcular minutos da aula
-                                    const [hours, minutes] = aula.horario.split(':').map(Number)
-                                    const aulaMinutes = hours * 60 + minutes
-                                    // Mostrar apenas aulas futuras (não encerradas)
-                                    return aulaMinutes > currentMinutes
-                                })
-                                .slice(0, 10) // Limitar a 10 aulas
-                                .map((aula) => (
+                            {homeData.aulasHoje.map((aula) => (
                                     <AulaHojeItem
                                         key={aula.id}
                                         aula={aula}

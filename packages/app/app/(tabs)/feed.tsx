@@ -179,8 +179,8 @@ export default function FeedScreen() {
     return (
         <View className="flex-1 bg-[#FDFDFD]">
             <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 pt-16 shadow-sm shadow-slate-200/50">
-                <Text className="mb-1 text-sm font-bold uppercase tracking-widest text-slate-500">Comunidade</Text>
-                <Text className="text-4xl font-black tracking-tight text-slate-900">Feed</Text>
+                <Text className="mb-2 text-4xl font-black tracking-tight text-slate-900">COMUNIDADE</Text>
+                <Text className="text-sm font-medium text-slate-500">Eventos, resenhas e evolução.</Text>
             </View>
 
             <FlatList
@@ -195,8 +195,6 @@ export default function FeedScreen() {
                 ListHeaderComponent={
                     <View>
                         <View className="mb-6 bg-white px-6 py-6">
-                            <Text className="mb-2 text-3xl font-black tracking-tight text-slate-900">COMUNIDADE</Text>
-                            <Text className="mb-4 text-sm font-medium text-slate-500">Eventos, resenhas e evolução.</Text>
                             <ScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
