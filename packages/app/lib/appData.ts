@@ -395,6 +395,66 @@ export async function fetchFeedData(alunoId: string): Promise<FeedPost[]> {
     })
 }
 
+export async function fetchSinglePost(alunoId: string, postId: string): Promise<FeedPost | null> {
+    const postRes = await supabase
+        .from('posts')
+        .select('*')
+        .eq('id', postId)
+        .eq('publicado', true)
+        .maybeSingle()
+
+    if (!postRes.data) return null
+
+    const postRow = postRes.data as Record<string, unknown>
+
+    const [commentsRes, likesRes] = await Promise.all([
+        supabase
+            .from('post_comentarios')
+            .select('*')
+            .eq('post_id', postId)
+            .order('created_at', { ascending: false }),
+        supabase
+            .from('post_curtidas')
+            .select('post_id, aluno_id')
+            .eq('post_id', postId)
+    ])
+
+    const commentsRows = !isMissingTable(commentsRes.error)
+        ? ((commentsRes.data as Record<string, unknown>[]) ?? [])
+        : []
+    const likesRows = !isMissingTable(likesRes.error)
+        ? ((likesRes.data as Array<{ post_id: string; aluno_id: string }>) ?? [])
+        : []
+
+    const comentarios: FeedComment[] = commentsRows.map((comment) => {
+        const author =
+            String(comment.autor_nome ?? comment.autor ?? comment.nome ?? 'Aluno do CT') || 'Aluno do CT'
+        return {
+            id: String(comment.id),
+            autor: author,
+            iniciais: getInitials(author),
+            texto: String(comment.texto ?? ''),
+            data: toBRDateTime(comment.created_at as string),
+        }
+    })
+
+    const curtidas = likesRows.length
+    const likedByMe = likesRows.some(like => like.aluno_id === alunoId)
+
+    const autor = String(postRow.autor ?? 'CT Boxe')
+    return {
+        id: String(postRow.id),
+        autor,
+        iniciais: getInitials(autor),
+        data: toBRDateTime(postRow.created_at as string),
+        texto: String(postRow.conteudo ?? ''),
+        imagem: (postRow.imagem_url as string) ?? null,
+        curtidas,
+        comentarios,
+        likedByMe,
+    }
+}
+
 export async function toggleFeedLike(postId: string, alunoId: string, currentlyLiked: boolean) {
     if (currentlyLiked) {
         await supabase
@@ -433,9 +493,18 @@ export async function toggleFeedLike(postId: string, alunoId: string, currentlyL
     }
 }
 
-export async function fetchHistoricoData(alunoId: string, month: Date): Promise<HistoricoData> {
-    const start = new Date(month.getFullYear(), month.getMonth(), 1)
-    const end = new Date(month.getFullYear(), month.getMonth() + 1, 1)
+export async function fetchHistoricoData(alunoId: string, monthStr: string): Promise<HistoricoData> {
+    const year = parseInt(monthStr.split('-')[0])
+    let monthNum = parseInt(monthStr.split('-')[1])
+    const startIso = `${year}-${monthNum.toString().padStart(2, '0')}-01T00:00:00.000Z`
+
+    let nextYear = year
+    let nextMonth = monthNum + 1
+    if (nextMonth > 12) {
+        nextYear += 1
+        nextMonth = 1
+    }
+    const endIso = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01T00:00:00.000Z`
 
     const [monthRes, totalRes, streakRes] = await Promise.all([
         supabase
@@ -443,8 +512,8 @@ export async function fetchHistoricoData(alunoId: string, month: Date): Promise<
             .select('id, created_at, data_checkin, aulas(titulo)')
             .eq('aluno_id', alunoId)
             .eq('status', 'presente')
-            .gte('created_at', start.toISOString())
-            .lt('created_at', end.toISOString())
+            .gte('created_at', startIso)
+            .lt('created_at', endIso)
             .order('created_at', { ascending: false }),
         supabase
             .from('presencas')
@@ -501,8 +570,9 @@ export async function fetchHistoricoData(alunoId: string, month: Date): Promise<
         else break
     }
 
+    const d = new Date(startIso)
     return {
-        mesLabel: monthLabel(month),
+        mesLabel: monthLabel(d),
         resumo: {
             mes: monthRows.length,
             sequencia: streakDates.length > 0 ? sequencia : 0,

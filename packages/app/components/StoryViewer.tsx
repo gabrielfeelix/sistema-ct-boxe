@@ -33,7 +33,7 @@ export default function StoryViewer({ stories, initialIndex, onClose, onStoryEnd
         Animated.timing(progressAnim, {
             toValue: 1,
             duration: stories[currentIndex].duracao * 1000,
-            useNativeDriver: false,
+            useNativeDriver: true,
         }).start(({ finished }) => {
             if (finished) {
                 handleNext();
@@ -81,11 +81,12 @@ export default function StoryViewer({ stories, initialIndex, onClose, onStoryEnd
                                 style={[
                                     {
                                         height: '100%',
+                                        width: '100%',
                                         backgroundColor: 'white',
-                                        width: isCompleted ? '100%' : isActive ? progressAnim.interpolate({
-                                            inputRange: [0, 1],
-                                            outputRange: ['0%', '100%'],
-                                        }) : '0%',
+                                        transform: [{
+                                            scaleX: isCompleted ? 1 : isActive ? progressAnim : 0
+                                        }],
+                                        transformOrigin: 'left',
                                     }
                                 ]}
                             />

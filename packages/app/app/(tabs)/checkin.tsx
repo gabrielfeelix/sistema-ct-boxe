@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Animated, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,7 +20,7 @@ export default function CheckinScreen() {
     const [loadingAction, setLoadingAction] = useState(false)
     const [loadingData, setLoadingData] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
-    const [animValues, setAnimValues] = useState<Record<string, Animated.Value>>({})
+    const animValuesRef = useRef<Record<string, Animated.Value>>({})
     const [data, setData] = useState<CheckinData>(emptyCheckinData)
 
     const loadData = useCallback(async () => {
@@ -48,14 +48,12 @@ export default function CheckinScreen() {
         setRefreshing(false)
     }, [loadData])
 
-    const getAnimValue = (id: string) => {
-        if (!animValues[id]) {
-            const newVal = new Animated.Value(1)
-            setAnimValues((prev) => ({ ...prev, [id]: newVal }))
-            return newVal
+    const getAnimValue = useCallback((id: string) => {
+        if (!animValuesRef.current[id]) {
+            animValuesRef.current[id] = new Animated.Value(1)
         }
-        return animValues[id]
-    }
+        return animValuesRef.current[id]
+    }, [])
 
     const handleCheckin = useCallback(async (aulaId: string) => {
         if (!aluno?.id || loadingAction) return

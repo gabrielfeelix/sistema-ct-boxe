@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
-import { Alert, Linking, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useState, Fragment } from 'react'
+import { Alert, FlatList, Linking, RefreshControl, Text, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchNotificacoes, markAllNotificacoesLidas, markNotificacaoLida } from '@/lib/appData'
@@ -15,10 +15,18 @@ export default function NotificacoesScreen() {
     const [refreshing, setRefreshing] = useState(false)
 
     const loadData = useCallback(async () => {
-        if (!aluno?.id) return
-        const data = await fetchNotificacoes(aluno.id)
-        setNotificacoes(data)
-        setLoading(false)
+        if (!aluno?.id) {
+            setLoading(false)
+            return
+        }
+        try {
+            const data = await fetchNotificacoes(aluno.id)
+            setNotificacoes(data)
+        } catch (error) {
+            console.error('[Notificacoes] Erro:', error)
+        } finally {
+            setLoading(false)
+        }
     }, [aluno?.id])
 
     useEffect(() => {
@@ -92,7 +100,13 @@ export default function NotificacoesScreen() {
                 <View className="flex-row items-center">
                     <TouchableOpacity
                         activeOpacity={0.7}
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back()
+                            } else {
+                                router.replace('/(tabs)')
+                            }
+                        }}
                         className="mr-4 h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-slate-50"
                     >
                         <Feather name="arrow-left" size={18} color="#0F172A" />
@@ -111,81 +125,81 @@ export default function NotificacoesScreen() {
                 )}
             </View>
 
-            <ScrollView
+            <FlatList
+                data={loading ? [] : notificacoes}
+                keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 100 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            >
-                {loading ? (
-                    <View className="px-6 py-16">
-                        <Text className="text-center text-sm text-slate-500">Carregando notificacoes...</Text>
-                    </View>
-                ) : notificacoes.length > 0 ? (
-                    <View className="px-4 pt-6">
-                        {notificacoes.map((item) => {
-                            const config = getIconConfig(item.tipo)
-                            return (
-                                <View key={item.id} className="mb-3">
-                                    <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        onPress={() => handleAction(item.id, item.acao, item.link)}
-                                        className={`relative flex-row rounded-3xl border px-5 py-5 ${
-                                            !item.lida
-                                                ? 'border-slate-200 bg-white shadow-md shadow-slate-200/50'
-                                                : 'border-slate-50 bg-[#FCFCFC]'
-                                        }`}
-                                    >
-                                        {!item.lida && (
-                                            <View className="absolute left-0 top-1/2 -mt-4 h-8 w-1.5 rounded-r-full bg-[#CC0000]" />
-                                        )}
-
-                                        <View
-                                            className={`mr-4 mt-1 h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-white shadow-sm ${config.bg}`}
-                                        >
-                                            <Feather name={config.iconName as never} size={18} color={config.iconColor} />
-                                        </View>
-
-                                        <View className="flex-1 justify-center">
-                                            <Text
-                                                className={`mb-1.5 text-[10px] font-black uppercase tracking-[0.2em] ${
-                                                    !item.lida ? 'text-slate-600' : 'text-slate-400'
-                                                }`}
-                                            >
-                                                {item.horario}
-                                            </Text>
-
-                                            <Text
-                                                className={`mb-1 text-base font-bold leading-snug tracking-tight ${
-                                                    !item.lida ? 'text-slate-900' : 'text-slate-500'
-                                                }`}
-                                            >
-                                                {item.titulo}
-                                            </Text>
-
-                                            <Text
-                                                className="text-sm font-medium leading-relaxed text-slate-500"
-                                                numberOfLines={2}
-                                            >
-                                                {item.subtitulo}
-                                            </Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                </View>
-                            )
-                        })}
-                    </View>
-                ) : (
-                    <View className="items-center justify-center px-6 py-20">
-                        <View className="mb-6 h-24 w-24 items-center justify-center rounded-[2rem] border border-slate-100 bg-slate-50 shadow-sm shadow-slate-200/50">
-                            <Feather name="bell-off" size={32} color="#CBD5E1" />
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                ListEmptyComponent={
+                    loading ? (
+                        <View className="px-6 py-16">
+                            <Text className="text-center text-sm text-slate-500">Carregando notificacoes...</Text>
                         </View>
-                        <Text className="mb-2 text-2xl font-black tracking-tight text-slate-900">Tudo limpo</Text>
-                        <Text className="max-w-xs px-6 text-center font-medium leading-relaxed text-slate-500">
-                            Voce esta totalmente atualizado com os avisos do Centro de Treinamento.
-                        </Text>
-                    </View>
-                )}
-            </ScrollView>
+                    ) : (
+                        <View className="items-center justify-center px-6 py-20">
+                            <View className="mb-6 h-24 w-24 items-center justify-center rounded-[2rem] border border-slate-100 bg-slate-50 shadow-sm shadow-slate-200/50">
+                                <Feather name="bell-off" size={32} color="#CBD5E1" />
+                            </View>
+                            <Text className="mb-2 text-2xl font-black tracking-tight text-slate-900">Tudo limpo</Text>
+                            <Text className="max-w-xs px-6 text-center font-medium leading-relaxed text-slate-500">
+                                Voce esta totalmente atualizado com os avisos do Centro de Treinamento.
+                            </Text>
+                        </View>
+                    )
+                }
+                renderItem={({ item }) => {
+                    const config = getIconConfig(item.tipo)
+                    return (
+                        <View className="mb-3">
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={() => handleAction(item.id, item.acao, item.link)}
+                                className={`relative flex-row rounded-3xl border px-5 py-5 ${!item.lida
+                                    ? 'border-slate-200 bg-white shadow-md shadow-slate-200/50'
+                                    : 'border-slate-50 bg-[#FCFCFC]'
+                                    }`}
+                            >
+                                {!item.lida && (
+                                    <View className="absolute left-0 top-1/2 -mt-4 h-8 w-1.5 rounded-r-full bg-[#CC0000]" />
+                                )}
+
+                                <View
+                                    className={`mr-4 mt-1 h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-white shadow-sm ${config.bg}`}
+                                >
+                                    <Feather name={config.iconName as never} size={18} color={config.iconColor} />
+                                </View>
+
+                                <View className="flex-1 justify-center">
+                                    <Text
+                                        className={`mb-1.5 text-[10px] font-black uppercase tracking-[0.2em] ${!item.lida ? 'text-slate-600' : 'text-slate-400'
+                                            }`}
+                                    >
+                                        {item.horario}
+                                    </Text>
+
+                                    <Text
+                                        className={`mb-1 text-base font-bold leading-snug tracking-tight ${!item.lida ? 'text-slate-900' : 'text-slate-500'
+                                            }`}
+                                    >
+                                        {item.titulo}
+                                    </Text>
+
+                                    <Text
+                                        className="text-sm font-medium leading-relaxed text-slate-500"
+                                        numberOfLines={2}
+                                    >
+                                        {item.subtitulo}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    )
+                }}
+            />
         </View>
     )
 }
