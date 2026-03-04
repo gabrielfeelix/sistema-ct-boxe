@@ -106,6 +106,12 @@ export default function StoryViewer({ stories, initialIndex, onClose, onStoryEnd
 
     const currentStory = stories[currentIndex];
 
+    // Proteção contra índice inválido
+    if (!currentStory) {
+        onClose();
+        return null;
+    }
+
     return (
         <View className="absolute z-50 top-0 left-0 right-0 bottom-0 bg-black flex-1 w-full h-full">
             {/* Progress bars */}

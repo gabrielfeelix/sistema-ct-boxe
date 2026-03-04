@@ -508,6 +508,38 @@ export async function fetchSinglePost(alunoId: string, postId: string): Promise<
     }
 }
 
+export async function addFeedComment(postId: string, alunoId: string, texto: string) {
+    if (!texto.trim()) return
+
+    const { data: aluno } = await supabase
+        .from('alunos')
+        .select('nome')
+        .eq('id', alunoId)
+        .single()
+
+    await supabase.from('post_comentarios').insert({
+        post_id: postId,
+        aluno_id: alunoId,
+        autor_nome: aluno?.nome ?? 'Aluno',
+        texto: texto.trim(),
+    })
+
+    // Notificar sobre novo comentário
+    const { data: post } = await supabase.from('posts').select('conteudo').eq('id', postId).single()
+
+    if (post && aluno) {
+        await supabase.from('notificacoes').insert({
+            titulo: 'Novo comentário no Feed',
+            subtitulo: `${aluno.nome} comentou em um post`,
+            mensagem: `${aluno.nome}: "${texto.substring(0, 40)}..."`,
+            tipo: 'ct',
+            lida: false,
+            acao: 'comment',
+            link: '/feed'
+        })
+    }
+}
+
 export async function toggleFeedLike(postId: string, alunoId: string, currentlyLiked: boolean) {
     if (currentlyLiked) {
         await supabase

@@ -41,9 +41,14 @@ export default function PagamentoScreen() {
             setLoading(false)
             return
         }
-        const data = await fetchPagamentoAtual(aluno.id)
-        setPagamento(data)
-        setLoading(false)
+        try {
+            const data = await fetchPagamentoAtual(aluno.id)
+            setPagamento(data)
+        } catch (error) {
+            console.error('[Pagamento] Erro:', error)
+        } finally {
+            setLoading(false)
+        }
     }, [aluno?.id])
 
     useEffect(() => {

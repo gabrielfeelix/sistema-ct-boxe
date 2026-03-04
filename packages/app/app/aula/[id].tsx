@@ -39,6 +39,13 @@ export default function AulaDetailModal() {
     const isAgendado = aula?.userStatus === 'agendado' || aula?.userStatus === 'confirmado'
     const isPresente = aula?.userStatus === 'presente'
 
+    const now = new Date()
+    const currentISO = now.toISOString().slice(0, 10)
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const classMinutes = aula ? (Number(aula.horario.split(':')[0]) * 60 + Number(aula.horario.split(':')[1])) : 0
+    const isToday = aula?.dataISO === currentISO
+    const isPassed = aula ? (aula.dataISO < currentISO || (isToday && classMinutes < currentMinutes)) : false
+
     const handleAction = async () => {
         if (!aluno?.id || !aula || saving || isPresente) return
 
@@ -55,13 +62,14 @@ export default function AulaDetailModal() {
     const buttonLabel = (() => {
         if (!aula) return 'INDISPONIVEL'
         if (saving) return 'PROCESSANDO...'
+        if (isPassed) return 'AULA ENCERRADA'
         if (isPresente) return 'CHECK-IN REALIZADO'
         if (isAgendado) return 'CANCELAR AGENDAMENTO'
         if (!isLivre) return 'TURMA LOTADA'
         return 'AGENDAR AULA'
     })()
 
-    const buttonEnabled = Boolean(aula) && !saving && !isPresente && (isAgendado || isLivre)
+    const buttonEnabled = Boolean(aula) && !saving && !isPresente && !isPassed && (isAgendado || isLivre)
 
     return (
         <View className="flex-1 justify-end">
@@ -177,22 +185,20 @@ export default function AulaDetailModal() {
                                     activeOpacity={0.8}
                                     disabled={!buttonEnabled}
                                     onPress={handleAction}
-                                    className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${
-                                        buttonEnabled
+                                    className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${buttonEnabled
                                             ? isAgendado
                                                 ? 'border border-red-200 bg-red-50 shadow-red-900/10'
                                                 : 'bg-slate-900 shadow-slate-900/30'
                                             : 'border border-slate-200 bg-slate-100'
-                                    }`}
+                                        }`}
                                 >
                                     <Text
-                                        className={`text-base font-black uppercase tracking-widest ${
-                                            buttonEnabled
+                                        className={`text-base font-black uppercase tracking-widest ${buttonEnabled
                                                 ? isAgendado
                                                     ? 'text-red-700'
                                                     : 'text-white'
                                                 : 'text-slate-400'
-                                        }`}
+                                            }`}
                                     >
                                         {buttonLabel}
                                     </Text>

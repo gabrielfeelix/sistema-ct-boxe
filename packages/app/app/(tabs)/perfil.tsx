@@ -1,7 +1,7 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Linking, RefreshControl, ScrollView, Text, TouchableOpacity, View, Image } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchPerfilData, type PerfilData } from '@/lib/appData'
@@ -28,10 +28,18 @@ export default function PerfilScreen() {
     const [refreshing, setRefreshing] = useState(false)
 
     const loadData = useCallback(async () => {
-        if (!aluno?.id) return
-        const data = await fetchPerfilData(aluno.id)
-        setPerfil(data)
-        setLoading(false)
+        if (!aluno?.id) {
+            setLoading(false)
+            return
+        }
+        try {
+            const data = await fetchPerfilData(aluno.id)
+            setPerfil(data)
+        } catch (error) {
+            console.error('[Perfil] Erro:', error)
+        } finally {
+            setLoading(false)
+        }
     }, [aluno?.id])
 
     useEffect(() => {
@@ -43,6 +51,10 @@ export default function PerfilScreen() {
         await loadData()
         setRefreshing(false)
     }, [loadData])
+
+    const openLink = (url: string) => {
+        Linking.openURL(url).catch(() => Alert.alert('Ops', 'Nao foi possivel abrir o link.'))
+    }
 
     const handleLogout = () => {
         Alert.alert('Encerrar sessao', 'Tem certeza que deseja sair da sua conta?', [
@@ -109,50 +121,6 @@ export default function PerfilScreen() {
                         <Text className="mb-6 text-xl font-bold tracking-tight text-slate-900">Minha Conta</Text>
 
                         <TouchableOpacity
-                            onPress={() => router.push('/pagamento')}
-                            activeOpacity={0.7}
-                            className="mb-4 flex-row items-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
-                        >
-                            <View className="mr-5 h-14 w-14 items-center justify-center rounded-2xl border border-red-100 bg-red-50">
-                                <Feather name="award" size={24} color="#CC0000" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">{planoLabel}</Text>
-                                <Text className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                                    Vence em {vencimento}
-                                </Text>
-                            </View>
-                            <View className="h-8 w-8 items-center justify-center rounded-full bg-slate-50">
-                                <Feather name="refresh-cw" size={16} color="#94A3B8" />
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => router.push('/contratos')}
-                            activeOpacity={0.7}
-                            className="mb-4 flex-row items-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
-                        >
-                            <View className="mr-5 h-14 w-14 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50">
-                                <Feather name="file-text" size={24} color="#D97706" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">Meus Contratos</Text>
-                                <Text
-                                    className={`text-xs font-bold uppercase tracking-widest ${
-                                        perfil.contratosAbertos.length > 0 ? 'text-amber-600' : 'text-slate-500'
-                                    }`}
-                                >
-                                    {perfil.contratosAbertos.length > 0
-                                        ? `${perfil.contratosAbertos.length} assinatura pendente`
-                                        : 'Termos e responsabilidades'}
-                                </Text>
-                            </View>
-                            <View className="h-8 w-8 items-center justify-center rounded-full bg-slate-50">
-                                <Feather name="chevron-right" size={16} color="#94A3B8" />
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
                             onPress={() => router.push('/dados-cadastrais')}
                             activeOpacity={0.7}
                             className="mb-4 flex-row items-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
@@ -170,6 +138,68 @@ export default function PerfilScreen() {
                             </View>
                             <View className="h-8 w-8 items-center justify-center rounded-full bg-slate-50">
                                 <Feather name="chevron-right" size={16} color="#94A3B8" />
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => router.push('/contratos')}
+                            activeOpacity={0.7}
+                            className="mb-4 flex-row items-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
+                        >
+                            <View className="mr-5 h-14 w-14 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50">
+                                <Feather name="file-text" size={24} color="#D97706" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">Meus Contratos</Text>
+                                <Text
+                                    className={`text-xs font-bold uppercase tracking-widest ${perfil.contratosAbertos.length > 0 ? 'text-amber-600' : 'text-slate-500'
+                                        }`}
+                                >
+                                    {perfil.contratosAbertos.length > 0
+                                        ? `${perfil.contratosAbertos.length} assinatura pendente`
+                                        : 'Termos e responsabilidades'}
+                                </Text>
+                            </View>
+                            <View className="h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                                <Feather name="chevron-right" size={16} color="#94A3B8" />
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => router.push('/faturas')}
+                            activeOpacity={0.7}
+                            className="mb-4 flex-row items-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
+                        >
+                            <View className="mr-5 h-14 w-14 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50">
+                                <Feather name="dollar-sign" size={24} color="#10B981" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">Financeiro</Text>
+                                <Text className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                                    Historico de pagamentos
+                                </Text>
+                            </View>
+                            <View className="h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                                <Feather name="chevron-right" size={16} color="#94A3B8" />
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => router.push('/pagamento')}
+                            activeOpacity={0.7}
+                            className="mb-4 flex-row items-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
+                        >
+                            <View className="mr-5 h-14 w-14 items-center justify-center rounded-2xl border border-red-100 bg-red-50">
+                                <Feather name="award" size={24} color="#CC0000" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">{planoLabel}</Text>
+                                <Text className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                                    Vence em {vencimento}
+                                </Text>
+                            </View>
+                            <View className="h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                                <Feather name="refresh-cw" size={16} color="#94A3B8" />
                             </View>
                         </TouchableOpacity>
 
@@ -198,71 +228,34 @@ export default function PerfilScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    <View className="mb-12">
-                        <View className="mb-6 flex-row items-center justify-between">
-                            <Text className="text-xl font-bold tracking-tight text-slate-900">Financeiro</Text>
-                            <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/faturas')}>
-                                <Text className="text-sm font-bold tracking-wide text-[#CC0000]">Ver Historico</Text>
+                    <View className="mb-8">
+                        <Text className="mb-6 text-xl font-bold tracking-tight text-slate-900">Nossa Comunidade</Text>
+                        <View className="flex-row items-center justify-between">
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => openLink('whatsapp://send?phone=5541999999999')}
+                                className="h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
+                            >
+                                <Image
+                                    source={require('../../assets/whatsapp.png')}
+                                    style={{ width: 32, height: 32, marginBottom: 8 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="text-xs font-bold text-slate-900">WhatsApp</Text>
                             </TouchableOpacity>
-                        </View>
 
-                        <View
-                            className={`rounded-3xl border p-6 shadow-sm ${
-                                isVencido
-                                    ? 'border-red-100 bg-red-50 shadow-red-900/10'
-                                    : 'border-slate-100 bg-white shadow-slate-200/50'
-                            }`}
-                        >
-                            <View className="mb-8 flex-row items-start justify-between">
-                                <View className="flex-row items-center">
-                                    <View
-                                        className={`mr-4 h-12 w-12 items-center justify-center rounded-2xl ${
-                                            isVencido ? 'bg-red-100' : 'bg-emerald-50'
-                                        }`}
-                                    >
-                                        <Feather name="dollar-sign" size={20} color={isVencido ? '#CC0000' : '#10B981'} />
-                                    </View>
-                                    <Text className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                                        Mensalidade
-                                    </Text>
-                                </View>
-
-                                <View
-                                    className={`rounded-full px-3 py-1.5 ${
-                                        isVencido ? 'bg-[#CC0000]' : 'bg-emerald-500'
-                                    }`}
-                                >
-                                    <Text className="text-[10px] font-black uppercase tracking-widest text-white">
-                                        {isVencido ? 'Pagamento pendente' : 'Status: Em dia'}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <View className="flex-row items-end justify-between border-t border-slate-100 pt-6">
-                                <View>
-                                    <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-                                        Vencimento
-                                    </Text>
-                                    <Text className="text-xl font-bold text-slate-900">{vencimento}</Text>
-                                </View>
-                                <View className="items-end">
-                                    <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-                                        Valor
-                                    </Text>
-                                    <Text className="text-3xl font-black tracking-tight text-slate-900">{valor}</Text>
-                                </View>
-                            </View>
-
-                            {isVencido && (
-                                <TouchableOpacity
-                                    activeOpacity={0.8}
-                                    onPress={() => router.push('/pagamento')}
-                                    className="mt-8 h-14 flex-row items-center justify-center rounded-2xl bg-[#CC0000] shadow-md shadow-red-900/30"
-                                >
-                                    <Feather name="credit-card" size={18} color="white" style={{ marginRight: 12 }} />
-                                    <Text className="font-bold tracking-wide text-white">PAGAR AGORA (PIX)</Text>
-                                </TouchableOpacity>
-                            )}
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => openLink('https://instagram.com/ctargelriboli')}
+                                className="h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
+                            >
+                                <Image
+                                    source={require('../../assets/instagram.png')}
+                                    style={{ width: 32, height: 32, marginBottom: 8 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="text-xs font-bold text-slate-900">Instagram</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 

@@ -1,10 +1,10 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { memo, useCallback, useEffect, useState } from 'react'
-import { FlatList, Modal, RefreshControl, ScrollView, Text, TouchableOpacity, View, Image } from 'react-native'
+import { FlatList, Modal, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View, Image, Keyboard } from 'react-native'
 
 import { FeedPostSkeleton } from '@/components/SkeletonLoader'
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchFeedData, toggleFeedLike } from '@/lib/appData'
+import { fetchFeedData, toggleFeedLike, addFeedComment } from '@/lib/appData'
 import type { FeedPost } from '@/lib/types'
 
 const FeedPostItem = memo(({ post, onLike, onComment }: {
@@ -108,6 +108,8 @@ export default function FeedScreen() {
     const [refreshing, setRefreshing] = useState(false)
     const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
     const [selectedPostForComments, setSelectedPostForComments] = useState<FeedPost | null>(null)
+    const [commentText, setCommentText] = useState('')
+    const [sendingComment, setSendingComment] = useState(false)
 
     const loadData = useCallback(async () => {
         if (!aluno?.id) {
@@ -173,8 +175,31 @@ export default function FeedScreen() {
         const post = posts.find(p => p.id === postId)
         if (post) {
             setSelectedPostForComments(post)
+            setCommentText('')
         }
     }, [posts])
+
+    const handleSendComment = useCallback(async () => {
+        if (!aluno?.id || !selectedPostForComments || !commentText.trim() || sendingComment) return
+
+        setSendingComment(true)
+        try {
+            await addFeedComment(selectedPostForComments.id, aluno.id, commentText)
+            setCommentText('')
+            Keyboard.dismiss()
+            // Reload feed data to get new comment
+            await loadData()
+            // Update selectedPostForComments with new data
+            const updatedPost = posts.find(p => p.id === selectedPostForComments.id)
+            if (updatedPost) {
+                setSelectedPostForComments(updatedPost)
+            }
+        } catch (error) {
+            console.error('Error sending comment:', error)
+        } finally {
+            setSendingComment(false)
+        }
+    }, [aluno?.id, selectedPostForComments, commentText, sendingComment, loadData, posts])
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
@@ -488,12 +513,22 @@ export default function FeedScreen() {
                                         {aluno?.nome?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'EU'}
                                     </Text>
                                 </View>
-                                <View className="flex-1 py-3">
-                                    <Text className="text-sm text-slate-400">
-                                        Adicionar um comentário...
-                                    </Text>
-                                </View>
-                                <TouchableOpacity className="ml-2 h-8 w-8 items-center justify-center rounded-full bg-[#CC0000]">
+                                <TextInput
+                                    value={commentText}
+                                    onChangeText={setCommentText}
+                                    placeholder="Adicionar um comentário..."
+                                    placeholderTextColor="#94A3B8"
+                                    className="flex-1 py-3 text-sm text-slate-900"
+                                    multiline
+                                    maxLength={500}
+                                    editable={!sendingComment}
+                                />
+                                <TouchableOpacity
+                                    onPress={handleSendComment}
+                                    disabled={!commentText.trim() || sendingComment}
+                                    className="ml-2 h-8 w-8 items-center justify-center rounded-full bg-[#CC0000]"
+                                    style={{ opacity: !commentText.trim() || sendingComment ? 0.5 : 1 }}
+                                >
                                     <Feather name="send" size={14} color="#FFFFFF" />
                                 </TouchableOpacity>
                             </View>

@@ -64,7 +64,11 @@ export default function HistoricoScreen() {
             return
         }
         try {
-            const data = await fetchHistoricoData(aluno.id, selectedMonth)
+            const yearStr = selectedMonth.getFullYear()
+            const monthStr = (selectedMonth.getMonth() + 1).toString().padStart(2, '0')
+            const filterStr = `${yearStr}-${monthStr}`
+
+            const data = await fetchHistoricoData(aluno.id, filterStr)
             setHistorico(data)
         } catch (error) {
             console.error('[Historico] Erro ao carregar historico:', error)

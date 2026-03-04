@@ -32,8 +32,8 @@ export function toCurrencyBRL(value?: number | string | null): string {
         typeof value === 'number'
             ? value
             : value
-              ? Number.parseFloat(String(value).replace(',', '.'))
-              : 0
+                ? Number.parseFloat(String(value).replace(',', '.'))
+                : 0
     const safe = Number.isFinite(parsed) ? parsed : 0
     return safe.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
@@ -61,6 +61,6 @@ export function daysUntil(dateLike?: string | null): number {
 }
 
 export function monthLabel(date: Date): string {
-    return date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).toUpperCase()
+    return date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '').toUpperCase()
 }
 
