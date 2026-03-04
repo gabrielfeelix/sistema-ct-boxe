@@ -139,7 +139,13 @@ export default function EventosScreen() {
                 <View className="flex-row items-center">
                     <TouchableOpacity
                         activeOpacity={0.7}
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back()
+                            } else {
+                                router.replace('/(tabs)')
+                            }
+                        }}
                         className="mr-4 h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-slate-50"
                     >
                         <Feather name="arrow-left" size={18} color="#0F172A" />

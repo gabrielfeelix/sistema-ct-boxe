@@ -442,6 +442,18 @@ export default function FeedScreen() {
                             data={selectedPostForComments?.comentarios || []}
                             showsVerticalScrollIndicator={false}
                             keyExtractor={(item, index) => `comment-${index}`}
+                            style={{ minHeight: 200 }}
+                            ListEmptyComponent={
+                                <View className="items-center justify-center py-16">
+                                    <Feather name="message-circle" size={48} color="#CBD5E1" />
+                                    <Text className="mt-4 text-center text-sm font-medium text-slate-500">
+                                        Nenhum comentário ainda.
+                                    </Text>
+                                    <Text className="mt-1 text-center text-xs text-slate-400">
+                                        Seja o primeiro a comentar!
+                                    </Text>
+                                </View>
+                            }
                             renderItem={({ item: comment }) => {
                                 const initials = comment.autor.split(' ').map(n => n[0]).join('').slice(0, 2)
                                 return (

@@ -49,7 +49,13 @@ export default function FaturasScreen() {
         <View className="flex-1 bg-[#FDFDFD]">
             <View className="z-10 flex-row items-center border-b border-slate-100 bg-white px-6 pb-6 pt-16 shadow-sm shadow-slate-200/30">
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={() => {
+                        if (router.canGoBack()) {
+                            router.back()
+                        } else {
+                            router.replace('/(tabs)/perfil')
+                        }
+                    }}
                     className="mr-4 h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-slate-50"
                 >
                     <Feather name="arrow-left" size={18} color="#0F172A" />

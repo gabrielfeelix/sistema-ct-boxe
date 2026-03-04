@@ -10,10 +10,13 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    Image,
+    ActivityIndicator,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchPerfilData, updateAlunoDados } from '@/lib/appData'
+import { fetchPerfilData, updateAlunoDados, uploadFotoPerfil } from '@/lib/appData'
 
 export default function DadosCadastraisScreen() {
     const router = useRouter()
@@ -22,20 +25,27 @@ export default function DadosCadastraisScreen() {
     const [nome, setNome] = useState('')
     const [email, setEmail] = useState('')
     const [telefone, setTelefone] = useState('')
+    const [fotoUrl, setFotoUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [uploadingFoto, setUploadingFoto] = useState(false)
 
     const loadData = useCallback(async () => {
         if (!aluno?.id) {
             setLoading(false)
             return
         }
-
-        const data = await fetchPerfilData(aluno.id)
-        setNome(data.aluno?.nome ?? '')
-        setEmail(data.aluno?.email ?? '')
-        setTelefone(data.aluno?.telefone ?? '')
-        setLoading(false)
+        try {
+            const data = await fetchPerfilData(aluno.id)
+            setNome(data.aluno?.nome ?? '')
+            setEmail(data.aluno?.email ?? '')
+            setTelefone(data.aluno?.telefone ?? '')
+            setFotoUrl(data.aluno?.foto_url ?? null)
+        } catch (error) {
+            console.error('[Dados Cadastrais] Erro:', error)
+        } finally {
+            setLoading(false)
+        }
     }, [aluno?.id])
 
     useEffect(() => {
@@ -64,7 +74,18 @@ export default function DadosCadastraisScreen() {
         await refreshAluno()
         setSaving(false)
 
-        Alert.alert('Sucesso', 'Dados salvos com sucesso.', [{ text: 'Voltar', onPress: () => router.back() }])
+        Alert.alert('Sucesso', 'Dados salvos com sucesso.', [
+            {
+                text: 'Voltar',
+                onPress: () => {
+                    if (router.canGoBack()) {
+                        router.back()
+                    } else {
+                        router.replace('/(tabs)/perfil')
+                    }
+                }
+            }
+        ])
     }
 
     const avatar = useMemo(
@@ -79,11 +100,43 @@ export default function DadosCadastraisScreen() {
         [nome]
     )
 
+    const handleAlterarFoto = async () => {
+        if (!aluno?.id) return
+
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            })
+
+            if (!result.canceled && result.assets[0]?.uri) {
+                setUploadingFoto(true)
+                const novaUrl = await uploadFotoPerfil(aluno.id, result.assets[0].uri)
+                setFotoUrl(novaUrl)
+                await refreshAluno()
+                setUploadingFoto(false)
+                Alert.alert('Sucesso', 'Sua foto foi atualizada.')
+            }
+        } catch (error) {
+            console.error('Erro ao alterar foto:', error)
+            setUploadingFoto(false)
+            Alert.alert('Erro', 'Nao foi possivel atualizar sua foto de perfil.')
+        }
+    }
+
     return (
         <View className="flex-1 bg-[#FDFDFD]">
             <View className="z-10 flex-row items-center border-b border-slate-100 bg-white px-6 pb-6 pt-16 shadow-sm shadow-slate-200/50">
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={() => {
+                        if (router.canGoBack()) {
+                            router.back()
+                        } else {
+                            router.replace('/(tabs)/perfil')
+                        }
+                    }}
                     className="mr-4 h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-slate-50"
                 >
                     <Feather name="arrow-left" size={18} color="#64748B" />
@@ -104,12 +157,28 @@ export default function DadosCadastraisScreen() {
                         ) : (
                             <>
                                 <View className="mb-10 items-center">
-                                    <View className="relative mb-4 h-24 w-24 items-center justify-center rounded-[1.5rem] bg-slate-900 shadow-xl shadow-slate-900/20">
-                                        <Text className="text-3xl font-black tracking-tighter text-white">{avatar || 'AL'}</Text>
-                                        <View className="absolute -bottom-2 -right-2 h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
+                                    <TouchableOpacity
+                                        activeOpacity={0.8}
+                                        onPress={handleAlterarFoto}
+                                        disabled={uploadingFoto}
+                                        className="relative mb-4 h-24 w-24 items-center justify-center rounded-full bg-slate-900 shadow-xl shadow-slate-900/20 overflow-visible"
+                                    >
+                                        <View className="h-full w-full rounded-full overflow-hidden items-center justify-center bg-slate-900 border-2 border-white">
+                                            {fotoUrl ? (
+                                                <Image source={{ uri: fotoUrl }} className="h-full w-full" />
+                                            ) : (
+                                                <Text className="text-3xl font-black tracking-tighter text-white">{avatar || 'AL'}</Text>
+                                            )}
+                                            {uploadingFoto && (
+                                                <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                                                    <ActivityIndicator color="white" />
+                                                </View>
+                                            )}
+                                        </View>
+                                        <View className="absolute -bottom-1 -right-1 h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
                                             <Feather name="camera" size={12} color="white" />
                                         </View>
-                                    </View>
+                                    </TouchableOpacity>
                                     <Text className="text-sm font-bold uppercase tracking-widest text-slate-400">Alterar Foto</Text>
                                 </View>
 

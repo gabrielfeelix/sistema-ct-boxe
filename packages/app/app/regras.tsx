@@ -13,7 +13,16 @@ export default function RegrasScreen() {
                     <FontAwesome5 name="exclamation-triangle" size={180} color="#FFFFFF" />
                 </View>
                 <View className="flex-row items-center mb-6 z-10">
-                    <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-white/10 items-center justify-center rounded-sm mr-4 border border-white/20">
+                    <TouchableOpacity
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back()
+                            } else {
+                                router.replace('/(tabs)/perfil')
+                            }
+                        }}
+                        className="w-10 h-10 bg-white/10 items-center justify-center rounded-sm mr-4 border border-white/20"
+                    >
                         <Feather name="arrow-left" size={18} color="#FFFFFF" />
                     </TouchableOpacity>
                     <View>
