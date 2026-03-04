@@ -318,7 +318,7 @@ export default function HomeScreen() {
 
                 {homeData.stories.length > 0 && (
                     <View className="bg-white px-6 pb-6 pt-4">
-                        <Text className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">TÉCNICAS</Text>
+                        <Text className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">VÍDEOS</Text>
                         <FlatList
                             horizontal
                             showsHorizontalScrollIndicator={false}
