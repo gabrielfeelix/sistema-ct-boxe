@@ -195,7 +195,7 @@ export default function FeedScreen() {
                 ListHeaderComponent={
                     <View>
                         <View className="mb-6 bg-white px-6 py-6">
-                            <Text className="mb-1 text-2xl font-black tracking-tight text-slate-900">Comunidade</Text>
+                            <Text className="mb-2 text-3xl font-black tracking-tight text-slate-900">COMUNIDADE</Text>
                             <Text className="mb-4 text-sm font-medium text-slate-500">Eventos, resenhas e evolução.</Text>
                             <ScrollView
                                 horizontal
