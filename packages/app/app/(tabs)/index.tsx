@@ -316,13 +316,16 @@ export default function HomeScreen() {
                     </View>
                 </View>
 
-                {homeData.stories.length > 0 && (
-                    <View className="bg-white px-6 pb-6 pt-4">
-                        <Text className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">VÍDEOS</Text>
-                        <FlatList
+                <View className="bg-white px-6 pb-6 pt-4">
+                    <Text className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">VÍDEOS</Text>
+                    <FlatList
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            data={homeData.stories}
+                            data={homeData.stories.length > 0 ? homeData.stories : [
+                                { id: '1', nome: 'Jab Básico', thumbnail: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400', assistido: false, duracao: 45, created_at: new Date().toISOString() },
+                                { id: '2', nome: 'Esquiva Lateral', thumbnail: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400', assistido: false, duracao: 60, created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
+                                { id: '3', nome: 'Combinação 1-2', thumbnail: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400', assistido: true, duracao: 90, created_at: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString() },
+                            ]}
                             keyExtractor={(story) => story.id}
                             contentContainerStyle={{ paddingRight: 16 }}
                             removeClippedSubviews={true}
@@ -392,7 +395,6 @@ export default function HomeScreen() {
                             }}
                         />
                     </View>
-                )}
 
                 <View className="px-6 pt-8">
                     {proximaAula ? (
@@ -470,7 +472,7 @@ export default function HomeScreen() {
 
                     <View className="mb-10">
                         <View className="mb-6 flex-row items-baseline justify-between">
-                            <Text className="text-xl font-bold tracking-tight text-slate-900">Aulas de Hoje</Text>
+                            <Text className="text-xl font-bold tracking-tight text-slate-900">Aulas</Text>
                             <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/(tabs)/checkin')}>
                                 <Text className="text-sm font-bold text-[#CC0000]">Ver todas</Text>
                             </TouchableOpacity>
