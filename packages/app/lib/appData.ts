@@ -203,8 +203,10 @@ async function getProximaAula(alunoId: string): Promise<AppAula | null> {
 
 export async function fetchHomeData(alunoId: string): Promise<HomeData> {
     const todayISO = getTodayISO()
+    const tomorrowISO = getTomorrowISO()
 
-    const [storiesRes, notifsRes, postsRes, aulasRes, proximaAula] = await Promise.all([
+    // Buscar aulas de hoje e amanhã em paralelo (evita duplicação)
+    const [storiesRes, notifsRes, postsRes, todayData, tomorrowData] = await Promise.all([
         supabase.from('stories_ativos').select('*').order('created_at', { ascending: false }),
         supabase
             .from('notificacoes')
@@ -218,8 +220,16 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
             .order('created_at', { ascending: false })
             .limit(2),
         fetchAulasWithPresence(alunoId, todayISO),
-        getProximaAula(alunoId),
+        fetchAulasWithPresence(alunoId, tomorrowISO),
     ])
+
+    // Calcular próxima aula localmente (evita re-query)
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    const orderedToday = [...todayData.aulas].sort(
+        (a, b) => horaToMinutes(a.horario) - horaToMinutes(b.horario)
+    )
+    const proximaAula = orderedToday.find((aula) => horaToMinutes(aula.horario) >= nowMinutes) ?? tomorrowData.aulas[0] ?? null
 
     const stories = ((storiesRes.data as Record<string, unknown>[]) ?? []).map((row) => ({
         id: String(row.id),
@@ -245,7 +255,7 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
         stories,
         notificacoesNaoLidas: notifsRes.count ?? 0,
         avisos,
-        aulasHoje: aulasRes.aulas,
+        aulasHoje: todayData.aulas,
         proximaAula,
     }
 }
@@ -430,7 +440,7 @@ export async function fetchHistoricoData(alunoId: string, month: Date): Promise<
     const [monthRes, totalRes, streakRes] = await Promise.all([
         supabase
             .from('presencas')
-            .select('id, created_at, data_checkin, aulas(titulo, nome)')
+            .select('id, created_at, data_checkin, aulas(titulo)')
             .eq('aluno_id', alunoId)
             .eq('status', 'presente')
             .gte('created_at', start.toISOString())
@@ -459,11 +469,11 @@ export async function fetchHistoricoData(alunoId: string, month: Date): Promise<
     const uniqueDays = [...new Set(days)].sort((a, b) => a - b)
 
     const presencasLista = monthRows.map((row) => {
-        const aulaObj = row.aulas as { titulo?: string; nome?: string } | null
+        const aulaObj = row.aulas as { titulo?: string } | null
         return {
             id: String(row.id),
             data: toBRDate((row.data_checkin as string) ?? (row.created_at as string)),
-            aula: aulaObj?.nome ?? aulaObj?.titulo ?? 'Treino de Boxe',
+            aula: aulaObj?.titulo ?? 'Treino de Boxe',
         }
     })
 

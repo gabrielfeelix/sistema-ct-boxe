@@ -53,15 +53,24 @@ export default function HistoricoScreen() {
     const [historico, setHistorico] = useState<HistoricoData>(
         emptyHistorico(monthOptions[monthOptions.length - 1].toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }))
     )
+    const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null)
 
     const selectedMonth = monthOptions[mesAtualIndex]
     const weeks = useMemo(() => buildCalendarWeeks(selectedMonth), [selectedMonth])
 
     const loadData = useCallback(async () => {
-        if (!aluno?.id) return
-        const data = await fetchHistoricoData(aluno.id, selectedMonth)
-        setHistorico(data)
-        setLoading(false)
+        if (!aluno?.id) {
+            setLoading(false)
+            return
+        }
+        try {
+            const data = await fetchHistoricoData(aluno.id, selectedMonth)
+            setHistorico(data)
+        } catch (error) {
+            console.error('[Historico] Erro ao carregar historico:', error)
+        } finally {
+            setLoading(false)
+        }
     }, [aluno?.id, selectedMonth])
 
     useEffect(() => {
@@ -75,11 +84,17 @@ export default function HistoricoScreen() {
     }, [loadData])
 
     const handlePrevMonth = () => {
-        if (mesAtualIndex > 0) setMesAtualIndex((prev) => prev - 1)
+        if (mesAtualIndex > 0) {
+            setMesAtualIndex((prev) => prev - 1)
+            setDiaSelecionado(null)
+        }
     }
 
     const handleNextMonth = () => {
-        if (mesAtualIndex < monthOptions.length - 1) setMesAtualIndex((prev) => prev + 1)
+        if (mesAtualIndex < monthOptions.length - 1) {
+            setMesAtualIndex((prev) => prev + 1)
+            setDiaSelecionado(null)
+        }
     }
 
     const today = new Date()
@@ -146,9 +161,8 @@ export default function HistoricoScreen() {
                                 activeOpacity={0.6}
                                 disabled={mesAtualIndex === 0}
                                 onPress={handlePrevMonth}
-                                className={`h-12 w-12 items-center justify-center rounded-xl bg-slate-50 ${
-                                    mesAtualIndex === 0 ? 'opacity-40' : ''
-                                }`}
+                                className={`h-12 w-12 items-center justify-center rounded-xl bg-slate-50 ${mesAtualIndex === 0 ? 'opacity-40' : ''
+                                    }`}
                             >
                                 <Feather name="chevron-left" size={20} color="#64748B" />
                             </TouchableOpacity>
@@ -161,9 +175,8 @@ export default function HistoricoScreen() {
                                 activeOpacity={0.6}
                                 disabled={mesAtualIndex === monthOptions.length - 1}
                                 onPress={handleNextMonth}
-                                className={`h-12 w-12 items-center justify-center rounded-xl bg-slate-50 ${
-                                    mesAtualIndex === monthOptions.length - 1 ? 'opacity-40' : ''
-                                }`}
+                                className={`h-12 w-12 items-center justify-center rounded-xl bg-slate-50 ${mesAtualIndex === monthOptions.length - 1 ? 'opacity-40' : ''
+                                    }`}
                             >
                                 <Feather name="chevron-right" size={20} color="#64748B" />
                             </TouchableOpacity>
@@ -181,43 +194,57 @@ export default function HistoricoScreen() {
                             ))}
                         </View>
 
-                        <View className="p-2">
+                        <View className="p-4 pb-6">
                             {weeks.map((semana, indexSemana) => (
-                                <View key={indexSemana} className="flex-row">
+                                <View key={`week-${indexSemana}`} className="flex-row mb-3 last:mb-0">
                                     {semana.map((dia, indexDia) => {
                                         const hasPresenca = dia ? historico.diasComPresenca.includes(dia) : false
                                         const isHoje = Boolean(dia && isCurrentMonth && dia === today.getDate())
 
+                                        const handleDayPress = () => {
+                                            if (!dia) return
+                                            setDiaSelecionado(dia)
+                                        }
+
                                         return (
                                             <TouchableOpacity
-                                                key={`${indexSemana}-${indexDia}`}
-                                                className="relative flex-1 items-center justify-center p-1"
+                                                key={dia ?? `empty-${indexSemana}-${indexDia}`}
+                                                className="relative flex-1 items-center justify-center px-1"
                                                 disabled={!dia}
-                                                activeOpacity={hasPresenca ? 0.7 : 1}
+                                                activeOpacity={0.7}
+                                                onPress={handleDayPress}
                                             >
                                                 {dia && (
                                                     <View
-                                                        className={`h-full w-full items-center justify-center rounded-2xl ${
-                                                            isHoje && !hasPresenca
+                                                        className={`items-center justify-center h-10 w-10 ${diaSelecionado === dia
+                                                            ? ''
+                                                            : isHoje && !hasPresenca
                                                                 ? 'border-2 border-slate-900 bg-white'
                                                                 : hasPresenca
-                                                                  ? 'border border-red-100 bg-red-50'
-                                                                  : 'bg-transparent'
-                                                        }`}
-                                                        style={{ aspectRatio: 1 }}
+                                                                    ? 'border border-red-100 bg-red-50'
+                                                                    : 'bg-transparent'
+                                                            }`}
+                                                        style={{
+                                                            backgroundColor: diaSelecionado === dia ? '#CC0000' : undefined,
+                                                            borderRadius: 9999
+                                                        }}
                                                     >
                                                         <Text
-                                                            className={`text-base font-bold ${
-                                                                isHoje && !hasPresenca
+                                                            className={`text-base font-bold ${diaSelecionado === dia
+                                                                ? ''
+                                                                : isHoje && !hasPresenca
                                                                     ? 'text-slate-900'
                                                                     : hasPresenca
-                                                                      ? 'text-[#CC0000]'
-                                                                      : 'text-slate-600'
-                                                            }`}
+                                                                        ? 'text-[#CC0000]'
+                                                                        : 'text-slate-600'
+                                                                }`}
+                                                            style={{
+                                                                color: diaSelecionado === dia ? '#FFFFFF' : undefined
+                                                            }}
                                                         >
                                                             {dia}
                                                         </Text>
-                                                        {hasPresenca && (
+                                                        {hasPresenca && diaSelecionado !== dia && (
                                                             <View className="absolute bottom-2 h-1.5 w-1.5 rounded-full bg-[#CC0000]" />
                                                         )}
                                                     </View>
@@ -244,11 +271,10 @@ export default function HistoricoScreen() {
                                 {historico.presencasLista.map((presenca, index) => (
                                     <View
                                         key={presenca.id}
-                                        className={`flex-row items-center p-4 ${
-                                            index !== historico.presencasLista.length - 1
-                                                ? 'border-b border-slate-50'
-                                                : ''
-                                        }`}
+                                        className={`flex-row items-center p-4 ${index !== historico.presencasLista.length - 1
+                                            ? 'border-b border-slate-50'
+                                            : ''
+                                            }`}
                                     >
                                         <View className="mr-5 h-12 w-12 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50">
                                             <Feather name="check" size={18} color="#10B981" />

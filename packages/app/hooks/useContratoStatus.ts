@@ -104,7 +104,8 @@ export function useContratoStatus(alunoId?: string | null) {
 
     useEffect(() => {
         if (!alunoId) return
-        const interval = setInterval(refresh, 30000)
+        // Poll every 5 minutes instead of 30s to reduce battery/network usage
+        const interval = setInterval(refresh, 5 * 60 * 1000)
         return () => clearInterval(interval)
     }, [alunoId, refresh])
 
