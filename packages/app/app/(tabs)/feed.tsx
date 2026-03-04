@@ -37,7 +37,7 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
         {post.imagem ? (
             <View className="mb-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
                 <Image
-                    source={{ uri: post.imagem }}
+                    source={{ uri: post.imagem, cache: 'force-cache' }}
                     style={{ width: '100%', height: 300 }}
                     resizeMode="cover"
                 />
@@ -134,7 +134,7 @@ export default function FeedScreen() {
         setRefreshing(false)
     }, [loadData])
 
-    const handleLike = async (postId: string) => {
+    const handleLike = useCallback(async (postId: string) => {
         if (!aluno?.id) return
 
         const current = posts.find((post) => post.id === postId)
@@ -167,11 +167,11 @@ export default function FeedScreen() {
                     : post
             )
         )
-    }
+    }, [aluno?.id, posts])
 
-    const handleComment = (postId: string) => {
+    const handleComment = useCallback((postId: string) => {
         router.push(`/comentarios/${postId}`)
-    }
+    }, [router])
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
