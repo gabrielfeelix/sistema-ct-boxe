@@ -192,57 +192,82 @@ export default function FeedScreen() {
                 ListHeaderComponent={
                     <View>
                         <View className="mb-6 bg-white px-6 py-6">
-                            <Text className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">
-                                PRÓXIMOS EVENTOS
-                            </Text>
+                            <Text className="mb-1 text-2xl font-black tracking-tight text-slate-900">Comunidade</Text>
+                            <Text className="mb-4 text-sm font-medium text-slate-500">Eventos, resenhas e evolução.</Text>
                             <ScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
                                 contentContainerStyle={{ paddingRight: 24 }}
                             >
-                                <View className="mr-4 w-72 overflow-hidden rounded-3xl border border-slate-100 bg-gradient-to-br from-[#CC0000] to-[#8B0000] shadow-lg shadow-red-900/20">
-                                    <View className="p-6">
-                                        <View className="mb-3 flex-row items-center">
-                                            <View className="h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10">
-                                                <Feather name="calendar" size={18} color="#FFFFFF" />
-                                            </View>
-                                        </View>
-                                        <Text className="mb-2 text-2xl font-black tracking-tight text-white">
-                                            Campeonato Interno
-                                        </Text>
-                                        <Text className="mb-4 text-sm font-medium leading-relaxed text-white/80">
-                                            Inscrições abertas para o campeonato de boxe. Participe e mostre sua evolução!
-                                        </Text>
-                                        <View className="flex-row items-center">
-                                            <Feather name="clock" size={14} color="rgba(255,255,255,0.7)" />
-                                            <Text className="ml-2 text-xs font-bold uppercase tracking-widest text-white/70">
-                                                15 DE MARÇO
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    className="relative mr-4 overflow-hidden rounded-2xl"
+                                    style={{ width: 220, height: 140 }}
+                                >
+                                    <Image
+                                        source={{ uri: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400', cache: 'force-cache' }}
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                    <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
-                                <View className="mr-4 w-72 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-                                    <View className="p-6">
-                                        <View className="mb-3 flex-row items-center">
-                                            <View className="h-10 w-10 items-center justify-center rounded-full bg-amber-50">
-                                                <Feather name="award" size={18} color="#D97706" />
-                                            </View>
-                                        </View>
-                                        <Text className="mb-2 text-2xl font-black tracking-tight text-slate-900">
-                                            Workshop de Defesa
+                                    <View className="absolute left-3 top-3 rounded-lg bg-amber-500 px-2 py-1">
+                                        <Text className="text-[9px] font-black uppercase tracking-widest text-white">
+                                            SOCIAL
                                         </Text>
-                                        <Text className="mb-4 text-sm font-medium leading-relaxed text-slate-600">
-                                            Técnicas avançadas de defesa com professor convidado especial.
+                                    </View>
+
+                                    <View className="absolute bottom-0 left-0 right-0 p-3">
+                                        <Text className="mb-2 text-base font-black tracking-tight text-white">
+                                            CHURRAS DOS ALUNOS
                                         </Text>
                                         <View className="flex-row items-center">
-                                            <Feather name="clock" size={14} color="#94A3B8" />
-                                            <Text className="ml-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-                                                22 DE MARÇO
+                                            <Feather name="calendar" size={12} color="rgba(255,255,255,0.9)" />
+                                            <Text className="ml-1.5 mr-3 text-[11px] font-bold text-white/90">
+                                                Sáb, 20/11
+                                            </Text>
+                                            <Feather name="clock" size={12} color="rgba(255,255,255,0.9)" />
+                                            <Text className="ml-1.5 text-[11px] font-bold text-white/90">
+                                                14:00
                                             </Text>
                                         </View>
                                     </View>
-                                </View>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    className="relative mr-4 overflow-hidden rounded-2xl"
+                                    style={{ width: 220, height: 140 }}
+                                >
+                                    <Image
+                                        source={{ uri: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400', cache: 'force-cache' }}
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                    <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
+                                    <View className="absolute left-3 top-3 rounded-lg bg-red-500 px-2 py-1">
+                                        <Text className="text-[9px] font-black uppercase tracking-widest text-white">
+                                            TREINO
+                                        </Text>
+                                    </View>
+
+                                    <View className="absolute bottom-0 left-0 right-0 p-3">
+                                        <Text className="mb-2 text-base font-black tracking-tight text-white">
+                                            AULÃO DE SPARRING
+                                        </Text>
+                                        <View className="flex-row items-center">
+                                            <Feather name="calendar" size={12} color="rgba(255,255,255,0.9)" />
+                                            <Text className="ml-1.5 mr-3 text-[11px] font-bold text-white/90">
+                                                Dom, 28/11
+                                            </Text>
+                                            <Feather name="clock" size={12} color="rgba(255,255,255,0.9)" />
+                                            <Text className="ml-1.5 text-[11px] font-bold text-white/90">
+                                                09:00
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
                             </ScrollView>
                         </View>
 
