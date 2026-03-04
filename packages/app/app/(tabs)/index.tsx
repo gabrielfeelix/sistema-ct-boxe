@@ -205,26 +205,33 @@ export default function HomeScreen() {
         router.push('/notificacoes')
     }
 
-    const handleConfirmar = async (aulaId: string) => {
+    const handleConfirmar = useCallback(async (aulaId: string) => {
         if (!aluno?.id) return
 
+        // Buscar o estado atual da aula
+        const aulaAtual = homeData.aulasHoje.find((a) => a.id === aulaId) || homeData.proximaAula
+        if (!aulaAtual || aulaAtual.id !== aulaId) return
+
+        const isConfirmada = Boolean(aulaAtual.presente) || Boolean(aulaAtual.agendado)
+
+        // Animação
         Animated.sequence([
             Animated.timing(heroScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
             Animated.timing(heroScale, { toValue: 1, duration: 150, useNativeDriver: true }),
         ]).start()
 
-        const isAulaConfirmada = Boolean(homeData.proximaAula?.presente) || Boolean(homeData.proximaAula?.agendado)
-
-        if (isAulaConfirmada) {
+        // Inverter status
+        if (isConfirmada) {
             await setPresencaStatus(aluno.id, aulaId, 'cancelada')
-            await loadData()
             Alert.alert('Cancelado', 'Sua presenca foi cancelada.')
         } else {
             await setPresencaStatus(aluno.id, aulaId, 'presente')
-            await loadData()
             Alert.alert('Presenca confirmada', 'Seu check-in foi registrado com sucesso.')
         }
-    }
+
+        // Recarregar dados
+        await loadData()
+    }, [aluno?.id, homeData.aulasHoje, homeData.proximaAula, heroScale, loadData])
 
     const handleAgendarOuCancelar = async (aulaId: string, isConfirmado: boolean) => {
         if (!aluno?.id) return
@@ -388,33 +395,34 @@ export default function HomeScreen() {
                 )}
 
                 <View className="px-6 pt-8">
-                    <View className="mb-10 overflow-hidden rounded-3xl bg-slate-900 p-6 shadow-xl shadow-slate-900/20">
-                        <View className="absolute -right-6 -top-6 opacity-10">
-                            <FontAwesome5 name="fire" size={120} color="#FFFFFF" />
-                        </View>
-
-                        <View className="mb-6 flex-row items-center">
-                            <View className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">
-                                <Text className="text-xs font-bold uppercase tracking-widest text-white">
-                                    Proxima Aula
-                                </Text>
+                    {proximaAula ? (
+                        <View className="relative mb-10 overflow-hidden rounded-[2.5rem] bg-[#0A0F1D] shadow-2xl shadow-slate-900/40">
+                            {/* Time Badge in Corner */}
+                            <View className="absolute right-0 top-0 h-16 w-24 items-center justify-center rounded-bl-[2.5rem] bg-[#CC0000]">
+                                <Text className="text-xl font-black text-white">{proximaAula.horario}</Text>
                             </View>
-                        </View>
 
-                        {proximaAula ? (
-                            <>
-                                <Text className="mb-2 text-3xl font-black tracking-tight text-white">
-                                    {proximaAula.nome}
+                            <View className="p-8 pt-10">
+                                <View className="mb-6 flex-row items-center">
+                                    <View className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
+                                        <Text className="text-[10px] font-black uppercase tracking-widest text-[#94A3B8]">
+                                            HOJE
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <Text className="mb-2 text-4xl font-black uppercase leading-tight tracking-tighter text-white">
+                                    {proximaAula.nome.split(' ').join('\n')}
                                 </Text>
 
                                 <View className="mb-8 flex-row items-center">
-                                    <Feather name="clock" size={18} color="#94A3B8" />
-                                    <Text className="ml-2 text-lg font-semibold text-slate-300">
-                                        {proximaAula.horario}
+                                    <Feather name="user" size={14} color="#CC0000" />
+                                    <Text className="ml-2 text-base font-bold text-slate-400">
+                                        {proximaAula.professor}
                                     </Text>
-                                    <View className="mx-3 h-1 w-1 rounded-full bg-slate-500" />
-                                    <Text className="text-sm font-medium text-slate-400">
-                                        {proximaAula.vagas_ocupadas}/{proximaAula.vagas_total} vagas
+                                    <View className="mx-3 h-1 w-1 rounded-full bg-slate-700" />
+                                    <Text className="text-xs font-black uppercase tracking-widest text-slate-500">
+                                        {proximaAula.vagas_ocupadas}/{proximaAula.vagas_total} ALUNOS
                                     </Text>
                                 </View>
 
@@ -422,29 +430,31 @@ export default function HomeScreen() {
                                     <TouchableOpacity
                                         activeOpacity={0.8}
                                         onPress={() => handleConfirmar(proximaAula.id)}
-                                        className={`h-14 flex-row items-center justify-center rounded-2xl shadow-md ${isAulaConfirmada
-                                            ? 'bg-slate-100 shadow-slate-200/50 border border-slate-200'
+                                        className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${isAulaConfirmada
+                                            ? 'border border-white/10 bg-white/5'
                                             : 'bg-[#CC0000] shadow-red-900/30'
                                             }`}
                                     >
-                                        <Text className={`text-base font-bold tracking-wide ${isAulaConfirmada ? 'text-slate-500' : 'text-white'}`}>
-                                            {isAulaConfirmada ? 'CANCELAR PRESENCA' : 'CONFIRMAR PRESENCA'}
+                                        <Text className="text-base font-black uppercase tracking-widest text-white">
+                                            {isAulaConfirmada ? 'CANCELAR PRESENCA' : 'CONFIRMAR PRESENÇA'}
                                         </Text>
                                         <Feather
                                             name={isAulaConfirmada ? 'x' : 'arrow-right'}
-                                            size={18}
-                                            color={isAulaConfirmada ? '#64748B' : 'white'}
-                                            style={{ marginLeft: 8 }}
+                                            size={20}
+                                            color="white"
+                                            style={{ marginLeft: 12 }}
                                         />
                                     </TouchableOpacity>
                                 </Animated.View>
-                            </>
-                        ) : (
+                            </View>
+                        </View>
+                    ) : (
+                        <View className="mb-10 rounded-3xl bg-slate-900 p-8">
                             <Text className="text-sm font-medium text-slate-400">
                                 Nenhuma aula disponivel nos proximos horarios.
                             </Text>
-                        )}
-                    </View>
+                        </View>
+                    )}
 
                     <View className="mb-10">
                         <View className="mb-6 flex-row items-baseline justify-between">
@@ -488,71 +498,6 @@ export default function HomeScreen() {
                                 />
                             ))
                         )}
-                    </View>
-
-                    <View className="mb-4">
-                        <Text className="mb-6 text-xl font-bold tracking-tight text-slate-900">Nossa Comunidade</Text>
-                        <View className="flex-row flex-wrap justify-between">
-                            <TouchableOpacity
-                                activeOpacity={0.7}
-                                onPress={() => openLink('whatsapp://send?phone=5541999999999')}
-                                className="mb-4 w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
-                            >
-                                <Image
-                                    source={require('../../assets/whatsapp.png')}
-                                    style={{ width: 36, height: 36, marginBottom: 10 }}
-                                    resizeMode="contain"
-                                />
-                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
-                                    Grupo Oficial
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                activeOpacity={0.7}
-                                onPress={() => openLink('https://instagram.com/ctargelriboli')}
-                                className="mb-4 w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
-                            >
-                                <Image
-                                    source={require('../../assets/instagram.png')}
-                                    style={{ width: 36, height: 36, marginBottom: 10 }}
-                                    resizeMode="contain"
-                                />
-                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
-                                    Instagram
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                activeOpacity={0.7}
-                                onPress={() => openLink('https://youtube.com')}
-                                className="w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
-                            >
-                                <Image
-                                    source={require('../../assets/youtube.png')}
-                                    style={{ width: 36, height: 36, marginBottom: 10 }}
-                                    resizeMode="contain"
-                                />
-                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
-                                    Aulas YT
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                activeOpacity={0.7}
-                                onPress={() => openLink('https://google.com/maps')}
-                                className="w-[48%] items-center justify-center rounded-2xl border border-slate-100 bg-white p-5 shadow-lg shadow-slate-200/40 transition-transform"
-                            >
-                                <Image
-                                    source={require('../../assets/google.png')}
-                                    style={{ width: 36, height: 36, marginBottom: 10 }}
-                                    resizeMode="contain"
-                                />
-                                <Text className="text-center text-xs font-bold tracking-tight text-slate-700">
-                                    Avalie-nos
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
                     </View>
                 </View>
             </ScrollView>

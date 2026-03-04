@@ -1,7 +1,9 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 
+import * as FileSystem from 'expo-file-system'
+import { Alert } from 'react-native'
 import { daysUntil, getInitials, monthLabel, toBRDate, toBRDateTime, toBRTime } from '@/lib/formatters'
-import { supabase } from '@/lib/supabase'
+import { supabase } from './supabase'
 import type {
     AlunoProfile,
     AppAula,
@@ -78,6 +80,7 @@ export interface AulaDetalhe {
     nome: string
     horario: string
     data: string
+    dataISO: string
     professor: string
     descricao: string
     vagas_total: number
@@ -106,6 +109,7 @@ function mapAula(row: Record<string, unknown>, vagasOcupadas = 0): AppAula {
         id: String(row.id),
         nome,
         data: dataRaw ? toBRDate(dataRaw) : '-',
+        dataISO: dataRaw || '',
         horario: toBRTime(horarioRaw),
         professor,
         vagas_total: vagasTotal,
@@ -203,10 +207,15 @@ async function getProximaAula(alunoId: string): Promise<AppAula | null> {
 
 export async function fetchHomeData(alunoId: string): Promise<HomeData> {
     const todayISO = getTodayISO()
-    const tomorrowISO = getTomorrowISO()
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
 
-    // Buscar aulas de hoje e amanhã em paralelo (evita duplicação)
-    const [storiesRes, notifsRes, postsRes, todayData, tomorrowData] = await Promise.all([
+    // Buscar próximas aulas (futuras apenas, próximos 7 dias)
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + 7)
+    const futureDateISO = futureDate.toISOString().slice(0, 10)
+
+    const [storiesRes, notifsRes, postsRes, aulasRes, presencasRes] = await Promise.all([
         supabase.from('stories_ativos').select('*').order('created_at', { ascending: false }),
         supabase
             .from('notificacoes')
@@ -219,24 +228,68 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
             .eq('publicado', true)
             .order('created_at', { ascending: false })
             .limit(2),
-        fetchAulasWithPresence(alunoId, todayISO),
-        fetchAulasWithPresence(alunoId, tomorrowISO),
+        supabase
+            .from('aulas')
+            .select('*')
+            .gte('data', todayISO)
+            .lte('data', futureDateISO)
+            .neq('status', 'cancelada')
+            .order('data', { ascending: true })
+            .order('hora_inicio', { ascending: true })
+            .limit(15),
+        supabase
+            .from('presencas')
+            .select('aula_id, aluno_id, status')
+            .eq('aluno_id', alunoId),
     ])
 
-    // Calcular próxima aula localmente (evita re-query)
-    const now = new Date()
-    const nowMinutes = now.getHours() * 60 + now.getMinutes()
-    const orderedToday = [...todayData.aulas].sort(
-        (a, b) => horaToMinutes(a.horario) - horaToMinutes(b.horario)
-    )
-    const proximaAula = orderedToday.find((aula) => horaToMinutes(aula.horario) >= nowMinutes) ?? tomorrowData.aulas[0] ?? null
+    // Processar aulas e presenças
+    const aulasRows = (aulasRes.data as Record<string, unknown>[]) ?? []
+    const presencasRows = (presencasRes.data as Array<{ aula_id: string; status: string }>) ?? []
+
+    // Map de ocupação e status do usuário
+    const ocupacaoByAula: Record<string, number> = {}
+    const userStatusByAula: Record<string, string> = {}
+
+    presencasRows.forEach((presenca) => {
+        const isCounted = ['agendado', 'presente', 'confirmado'].includes(presenca.status)
+        if (isCounted) {
+            ocupacaoByAula[presenca.aula_id] = (ocupacaoByAula[presenca.aula_id] ?? 0) + 1
+        }
+        userStatusByAula[presenca.aula_id] = presenca.status
+    })
+
+    // Processar aulas e filtrar apenas futuras
+    const allAulas = aulasRows.map((row) => {
+        const id = String(row.id)
+        const mapped = mapAula(row, ocupacaoByAula[id] ?? 0)
+        const userStatus = userStatusByAula[id]
+        return {
+            ...mapped,
+            agendado: userStatus === 'agendado' || userStatus === 'confirmado',
+            presente: userStatus === 'presente',
+            data: String(row.data),
+        }
+    })
+
+    // Filtrar apenas aulas futuras (data > hoje OU (data === hoje E hora >= agora))
+    const aulasFuturas = allAulas.filter((aula) => {
+        if (aula.data > todayISO) return true
+        if (aula.data === todayISO && horaToMinutes(aula.horario) >= nowMinutes) return true
+        return false
+    })
+
+    // Pegar as próximas 10 aulas
+    const aulasHoje = aulasFuturas.slice(0, 10)
+    const proximaAula = aulasFuturas[0] ?? null
 
     const stories = ((storiesRes.data as Record<string, unknown>[]) ?? []).map((row) => ({
         id: String(row.id),
         nome: String(row.autor ?? 'CT Boxe'),
         thumbnail: (row.imagem_url as string) ?? null,
         assistido: false,
-        duracao: 15,
+        duracao: Number(row.duracao ?? 15),
+        created_at: (row.created_at as string) ?? null,
     })) as HomeStory[]
 
     const avisos = ((postsRes.data as Record<string, unknown>[]) ?? []).map((row) => {
@@ -255,7 +308,7 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
         stories,
         notificacoesNaoLidas: notifsRes.count ?? 0,
         avisos,
-        aulasHoje: todayData.aulas,
+        aulasHoje,
         proximaAula,
     }
 }
@@ -863,6 +916,34 @@ export async function updateAlunoDados(alunoId: string, payload: Partial<AlunoPr
     await supabase.from('alunos').update(cleanPayload).eq('id', alunoId)
 }
 
+function base64ToArrayBuffer(base64: string) {
+    const binaryString = atob(base64)
+    const len = binaryString.length
+    const bytes = new Uint8Array(len)
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+    }
+    return bytes.buffer
+}
+
+export async function uploadFotoPerfil(alunoId: string, imageUri: string): Promise<string> {
+    const base64 = await FileSystem.readAsStringAsync(imageUri, { encoding: 'base64' })
+    const ext = imageUri.split('.').pop()
+    const filePath = `${alunoId}/${new Date().getTime()}.${ext}`
+
+    const { error } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, base64ToArrayBuffer(base64), { contentType: `image/${ext}`, upsert: true })
+
+    if (error) throw error
+
+    const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+    const fotoUrl = publicUrlData.publicUrl
+
+    await supabase.from('alunos').update({ foto_url: fotoUrl }).eq('id', alunoId)
+    return fotoUrl
+}
+
 export async function fetchPagamentoAtual(alunoId: string): Promise<PagamentoAtual | null> {
     const paymentRes = await supabase
         .from('pagamentos')
@@ -944,6 +1025,7 @@ export async function fetchAulaDetalhe(alunoId: string, aulaId: string): Promise
         nome: mapped.nome,
         horario: mapped.horario,
         data: mapped.data,
+        dataISO: mapped.dataISO,
         professor: mapped.professor,
         descricao: mapped.descricao ?? 'Treino tecnico de boxe para todos os niveis.',
         vagas_total: mapped.vagas_total,
