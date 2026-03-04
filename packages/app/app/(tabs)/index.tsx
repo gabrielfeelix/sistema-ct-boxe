@@ -342,8 +342,8 @@ export default function HomeScreen() {
                                     <TouchableOpacity
                                         activeOpacity={0.85}
                                         onPress={() => openStory(index)}
-                                        className="relative mr-4 overflow-hidden rounded-2xl"
-                                        style={{ width: 140, height: 180 }}
+                                        className="relative mr-3 overflow-hidden rounded-3xl"
+                                        style={{ width: 110, height: 160 }}
                                     >
                                         {story.thumbnail ? (
                                             <Image
@@ -353,33 +353,33 @@ export default function HomeScreen() {
                                             />
                                         ) : (
                                             <View className="h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
-                                                <Text className="text-3xl font-black text-white opacity-50">
+                                                <Text className="text-2xl font-black text-white opacity-50">
                                                     {getInitials(story.nome)}
                                                 </Text>
                                             </View>
                                         )}
 
                                         {/* Gradient overlay */}
-                                        <View className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                                        <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
                                         {/* NEW badge */}
                                         {isNew && (
-                                            <View className="absolute right-2 top-2 rounded-md bg-[#CC0000] px-2 py-1">
-                                                <Text className="text-[9px] font-black uppercase tracking-widest text-white">
+                                            <View className="absolute right-1.5 top-1.5 rounded-md bg-[#CC0000] px-1.5 py-0.5">
+                                                <Text className="text-[8px] font-black uppercase tracking-widest text-white">
                                                     NOVO
                                                 </Text>
                                             </View>
                                         )}
 
                                         {/* Title */}
-                                        <View className="absolute bottom-0 left-0 right-0 p-3">
-                                            <Text className="text-xs font-black text-white" numberOfLines={2}>
+                                        <View className="absolute bottom-0 left-0 right-0 p-2">
+                                            <Text className="text-[11px] font-black text-white" numberOfLines={1}>
                                                 {story.nome}
                                             </Text>
                                             {story.duracao && (
-                                                <View className="mt-1 flex-row items-center">
-                                                    <Feather name="clock" size={10} color="rgba(255,255,255,0.7)" />
-                                                    <Text className="ml-1 text-[10px] font-medium text-white/70">
+                                                <View className="mt-0.5 flex-row items-center">
+                                                    <Feather name="clock" size={8} color="rgba(255,255,255,0.7)" />
+                                                    <Text className="ml-1 text-[9px] font-medium text-white/70">
                                                         {story.duracao}s
                                                     </Text>
                                                 </View>

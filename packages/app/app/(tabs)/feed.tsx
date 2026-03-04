@@ -13,11 +13,11 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
     onLike: (postId: string) => void
     onComment: (postId: string) => void
 }) => (
-    <View className="mx-6 mb-5 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm shadow-slate-200/30">
-        <View className="p-5 pb-4">
-            <View className="mb-4 flex-row items-center">
-                <View className="mr-3 h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-slate-100 bg-slate-800 shadow-sm">
-                    <Text className="text-base font-black tracking-tighter text-white">
+    <View className="mx-6 mb-4 overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-sm">
+        <View className="p-4 pb-3">
+            <View className="mb-3 flex-row items-center">
+                <View className="mr-3 h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-800">
+                    <Text className="text-sm font-black tracking-tighter text-white">
                         {post.iniciais}
                     </Text>
                 </View>
@@ -25,42 +25,42 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
                     <Text className="text-[15px] font-bold tracking-tight text-slate-900">
                         {post.autor}
                     </Text>
-                    <Text className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                    <Text className="text-[10px] font-medium text-slate-400">
                         {post.data}
                     </Text>
                 </View>
             </View>
 
-            <Text className="mb-4 text-[15px] font-medium leading-relaxed text-slate-700">
+            <Text className="mb-3 text-[15px] font-medium leading-relaxed text-slate-700">
                 {post.texto}
             </Text>
         </View>
 
         {post.imagem ? (
-            <View className="mb-4 overflow-hidden px-5">
+            <View className="mb-3 overflow-hidden px-4">
                 <View className="overflow-hidden rounded-2xl">
                     <Image
                         source={{ uri: post.imagem, cache: 'force-cache' }}
-                        style={{ width: '100%', height: 280 }}
+                        style={{ width: '100%', height: 220 }}
                         resizeMode="cover"
                     />
                 </View>
             </View>
         ) : null}
 
-        <View className="flex-row items-center border-t border-slate-100 px-5 py-3">
+        <View className="flex-row items-center border-t border-slate-100/80 px-4 py-2.5">
             <TouchableOpacity
                 activeOpacity={0.6}
                 onPress={() => onLike(post.id)}
                 className="mr-6 flex-row items-center"
             >
                 <View
-                    className={`mr-2 h-9 w-9 items-center justify-center rounded-full ${post.likedByMe ? 'bg-red-50' : 'bg-slate-50'
+                    className={`mr-2 h-8 w-8 items-center justify-center rounded-full ${post.likedByMe ? 'bg-red-50' : 'bg-slate-50'
                         }`}
                 >
                     <FontAwesome5
                         name="fire"
-                        size={16}
+                        size={14}
                         color={post.likedByMe ? '#CC0000' : '#94A3B8'}
                         solid={post.likedByMe}
                     />
@@ -78,8 +78,8 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
                 onPress={() => onComment(post.id)}
                 className="flex-row items-center"
             >
-                <View className="mr-2 h-9 w-9 items-center justify-center rounded-full bg-slate-50">
-                    <Feather name="message-circle" size={16} color="#64748B" />
+                <View className="mr-2 h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                    <Feather name="message-circle" size={14} color="#64748B" />
                 </View>
                 <Text className="text-sm font-bold text-slate-600">
                     {post.comentarios.length}
@@ -88,7 +88,7 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
         </View>
 
         {post.comentarios.length > 0 && (
-            <View className="border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+            <View className="border-t border-slate-100/80 bg-slate-50/40 px-4 py-3">
                 <View className="flex-row items-start">
                     <Text className="mr-2 text-xs font-bold text-slate-900">
                         {post.comentarios[0].autor}
