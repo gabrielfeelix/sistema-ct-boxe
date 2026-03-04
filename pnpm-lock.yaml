@@ -40,6 +40,9 @@ importers:
       babel-preset-expo:
         specifier: ~55.0.8
         version: 55.0.10(@babel/core@7.29.0)(expo@55.0.4)(react-refresh@0.18.0)
+      base64-arraybuffer:
+        specifier: ^1.0.2
+        version: 1.0.2
       expo:
         specifier: ~55.0.1
         version: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(expo-router@55.0.1)(react-dom@19.2.0)(react-native@0.83.2)(react@19.2.0)(typescript@5.9.3)
@@ -49,6 +52,12 @@ importers:
       expo-constants:
         specifier: ~55.0.7
         version: 55.0.7(expo@55.0.4)(react-native@0.83.2)(typescript@5.9.3)
+      expo-file-system:
+        specifier: ~55.0.10
+        version: 55.0.10(expo@55.0.4)(react-native@0.83.2)
+      expo-image-picker:
+        specifier: ~55.0.10
+        version: 55.0.10(expo@55.0.4)
       expo-linking:
         specifier: ~55.0.7
         version: 55.0.7(expo@55.0.4)(react-native@0.83.2)(react@19.2.0)(typescript@5.9.3)
@@ -7421,6 +7430,11 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
+  /base64-arraybuffer@1.0.2:
+    resolution: {integrity: sha512-I3yl4r9QB5ZRY3XuJVEPfc2XhZO6YweFPI+UovAzn+8/hb3oJ6lnysaFcjVpkCPfVWFUDvoZ8kmVDP7WyRtYtQ==}
+    engines: {node: '>= 0.6.0'}
+    dev: false
+
   /base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
     dev: false
@@ -8943,6 +8957,23 @@ packages:
       expo: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(expo-router@55.0.1)(react-dom@19.2.0)(react-native@0.83.2)(react@19.2.0)(typescript@5.9.3)
       react: 19.2.0
       react-native: 0.83.2(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
+    dev: false
+
+  /expo-image-loader@55.0.0(expo@55.0.4):
+    resolution: {integrity: sha512-NOjp56wDrfuA5aiNAybBIjqIn1IxKeGJ8CECWZncQ/GzjZfyTYAHTCyeApYkdKkMBLHINzI4BbTGSlbCa0fXXQ==}
+    peerDependencies:
+      expo: '*'
+    dependencies:
+      expo: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(expo-router@55.0.1)(react-dom@19.2.0)(react-native@0.83.2)(react@19.2.0)(typescript@5.9.3)
+    dev: false
+
+  /expo-image-picker@55.0.10(expo@55.0.4):
+    resolution: {integrity: sha512-uspDWjNBNjUD//MLzu7oEtT9cuNgW5pd6HxPfAJffRIdkdCUCYxLYXRp5pfB6JtW640eCdvm2QEQrQC172Y62g==}
+    peerDependencies:
+      expo: '*'
+    dependencies:
+      expo: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(expo-router@55.0.1)(react-dom@19.2.0)(react-native@0.83.2)(react@19.2.0)(typescript@5.9.3)
+      expo-image-loader: 55.0.0(expo@55.0.4)
     dev: false
 
   /expo-image@55.0.5(expo@55.0.4)(react-native-web@0.21.2)(react-native@0.83.2)(react@19.2.0):
