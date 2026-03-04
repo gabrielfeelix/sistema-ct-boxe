@@ -274,79 +274,118 @@ export default function HomeScreen() {
                 contentContainerStyle={{ paddingBottom: 100 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-                <View className="border-b border-slate-100 bg-white px-6 pb-6 pt-16">
-                    <View className="flex-row items-center justify-between">
-                        <View>
-                            <Text className="mb-1 text-sm font-bold uppercase tracking-widest text-slate-500">
-                                Bem-vindo de volta
+                <View className="border-b border-slate-100 bg-white px-6 pb-4 pt-16">
+                    <View className="mb-4 flex-row items-start justify-between">
+                        <View className="flex-1">
+                            <Text className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                BEM-VINDO DE VOLTA
                             </Text>
-                            <View className="flex-row items-center">
-                                <Text className="text-3xl font-black tracking-tight text-slate-900">
-                                    Ola, {aluno?.nome?.split(' ')[0] ?? 'Atleta'}
-                                </Text>
-                                <Text className="ml-2 text-2xl">👊</Text>
-                            </View>
+                            <Text className="text-2xl font-black tracking-tight text-slate-900">
+                                {aluno?.nome?.split(' ')[0] ?? 'Atleta'}.
+                            </Text>
                         </View>
-                        <View className="flex-row items-center space-x-3">
-                            <TouchableOpacity
-                                onPress={() => router.push('/eventos')}
-                                activeOpacity={0.7}
-                                className="h-12 w-12 items-center justify-center rounded-full border border-red-100 bg-red-50"
-                            >
-                                <Feather name="calendar" size={20} color="#CC0000" />
-                            </TouchableOpacity>
-
+                        <View className="flex-row items-center gap-3">
                             <TouchableOpacity
                                 onPress={handleNotificationClick}
                                 activeOpacity={0.7}
-                                className="ml-2 h-12 w-12 items-center justify-center rounded-full border border-slate-100 bg-slate-50"
+                                className="relative h-11 w-11 items-center justify-center rounded-full border border-slate-100 bg-slate-50"
                             >
-                                <Feather name="bell" size={20} color="#0F172A" />
+                                <Feather name="bell" size={18} color="#0F172A" />
                                 {homeData.notificacoesNaoLidas > 0 && (
-                                    <View className="absolute right-2 top-2 min-h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#CC0000] px-1">
-                                        <Text className="text-[10px] font-black text-white">
+                                    <View className="absolute right-1.5 top-1.5 min-h-[16px] min-w-[16px] items-center justify-center rounded-full border border-white bg-[#CC0000] px-0.5">
+                                        <Text className="text-[9px] font-black text-white">
                                             {homeData.notificacoesNaoLidas}
                                         </Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
+
+                            <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-slate-200 bg-slate-800 shadow-sm">
+                                <Text className="text-base font-black tracking-tighter text-white">
+                                    {getInitials(aluno?.nome ?? 'Atleta')}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 </View>
 
-                <View className="border-b border-slate-50 bg-white pb-2 pt-6">
-                    <FlatList
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        data={homeData.stories}
-                        keyExtractor={(story) => story.id}
-                        contentContainerStyle={{ paddingLeft: 24, paddingRight: 40 }}
-                        removeClippedSubviews={true}
-                        maxToRenderPerBatch={10}
-                        windowSize={5}
-                        renderItem={({ item: story, index }) => (
-                            <TouchableOpacity
-                                activeOpacity={0.8}
-                                onPress={() => openStory(index)}
-                                className="mr-5 items-center"
-                            >
-                                <View
-                                    className={`mb-2 h-16 w-16 rounded-full border-[2.5px] p-[2px] ${!story.assistido ? 'border-[#CC0000]' : 'border-slate-300'
-                                        }`}
-                                >
-                                    <View className="flex-1 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-800 shadow-sm">
-                                        <Text className="text-xl font-black tracking-tighter text-white">
-                                            {getInitials(story.nome)}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <Text className="w-16 text-center text-xs font-bold text-slate-700" numberOfLines={1}>
-                                    {story.nome}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
-                </View>
+                {homeData.stories.length > 0 && (
+                    <View className="bg-white px-6 pb-6 pt-4">
+                        <Text className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">TÉCNICAS</Text>
+                        <FlatList
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            data={homeData.stories}
+                            keyExtractor={(story) => story.id}
+                            contentContainerStyle={{ paddingRight: 16 }}
+                            removeClippedSubviews={true}
+                            maxToRenderPerBatch={10}
+                            windowSize={5}
+                            renderItem={({ item: story, index }) => {
+                                // Check if story is from last month (30 days)
+                                const storyDate = new Date(story.created_at || '')
+                                const now = new Date()
+                                const daysDiff = Math.floor((now.getTime() - storyDate.getTime()) / (1000 * 60 * 60 * 24))
+                                const isNew = daysDiff <= 30
+
+                                return (
+                                    <TouchableOpacity
+                                        activeOpacity={0.85}
+                                        onPress={() => openStory(index)}
+                                        className="relative mr-4 overflow-hidden rounded-2xl"
+                                        style={{ width: 140, height: 180 }}
+                                    >
+                                        {story.thumbnail ? (
+                                            <Image
+                                                source={{ uri: story.thumbnail, cache: 'force-cache' }}
+                                                style={{ width: '100%', height: '100%' }}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <View className="h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+                                                <Text className="text-3xl font-black text-white opacity-50">
+                                                    {getInitials(story.nome)}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {/* Gradient overlay */}
+                                        <View className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+
+                                        {/* NEW badge */}
+                                        {isNew && (
+                                            <View className="absolute right-2 top-2 rounded-md bg-[#CC0000] px-2 py-1">
+                                                <Text className="text-[9px] font-black uppercase tracking-widest text-white">
+                                                    NOVO
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {/* Title */}
+                                        <View className="absolute bottom-0 left-0 right-0 p-3">
+                                            <Text className="text-xs font-black text-white" numberOfLines={2}>
+                                                {story.nome}
+                                            </Text>
+                                            {story.duracao && (
+                                                <View className="mt-1 flex-row items-center">
+                                                    <Feather name="clock" size={10} color="rgba(255,255,255,0.7)" />
+                                                    <Text className="ml-1 text-[10px] font-medium text-white/70">
+                                                        {story.duracao}s
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+
+                                        {/* Unread indicator */}
+                                        {!story.assistido && (
+                                            <View className="absolute left-0 top-0 h-full w-1 bg-[#CC0000]" />
+                                        )}
+                                    </TouchableOpacity>
+                                )
+                            }}
+                        />
+                    </View>
+                )}
 
                 <View className="px-6 pt-8">
                     <View className="mb-10 overflow-hidden rounded-3xl bg-slate-900 p-6 shadow-xl shadow-slate-900/20">

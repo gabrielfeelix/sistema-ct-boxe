@@ -25,6 +25,7 @@ export interface HomeStory {
     thumbnail: string | null
     assistido: boolean
     duracao: number
+    created_at?: string | null
 }
 
 export interface HomeNotification {
@@ -42,6 +43,7 @@ export interface AppAula {
     id: string
     nome: string
     data: string
+    dataISO: string
     horario: string
     professor: string
     vagas_total: number
