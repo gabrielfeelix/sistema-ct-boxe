@@ -1,6 +1,5 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { memo, useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'expo-router'
 import { FlatList, Modal, RefreshControl, ScrollView, Text, TouchableOpacity, View, Image } from 'react-native'
 
 import { FeedPostSkeleton } from '@/components/SkeletonLoader'
@@ -103,12 +102,12 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
 ))
 
 export default function FeedScreen() {
-    const router = useRouter()
     const { aluno } = useAuth()
     const [posts, setPosts] = useState<FeedPost[]>([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
     const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
+    const [selectedPostForComments, setSelectedPostForComments] = useState<FeedPost | null>(null)
 
     const loadData = useCallback(async () => {
         if (!aluno?.id) {
@@ -171,8 +170,11 @@ export default function FeedScreen() {
     }, [aluno?.id, posts])
 
     const handleComment = useCallback((postId: string) => {
-        router.push(`/comentarios/${postId}`)
-    }, [router])
+        const post = posts.find(p => p.id === postId)
+        if (post) {
+            setSelectedPostForComments(post)
+        }
+    }, [posts])
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
@@ -405,6 +407,87 @@ export default function FeedScreen() {
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={selectedPostForComments !== null}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setSelectedPostForComments(null)}
+            >
+                <View className="flex-1 justify-end bg-black/50">
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => setSelectedPostForComments(null)}
+                        className="flex-1"
+                    />
+                    <View className="max-h-[70%] overflow-hidden rounded-t-3xl bg-white">
+                        <View className="border-b border-slate-100 px-6 py-4">
+                            <View className="flex-row items-center justify-between">
+                                <Text className="text-lg font-black tracking-tight text-slate-900">
+                                    COMENTÁRIOS ({selectedPostForComments?.comentarios.length || 0})
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => setSelectedPostForComments(null)}
+                                    className="h-8 w-8 items-center justify-center rounded-full bg-slate-100"
+                                >
+                                    <Feather name="x" size={18} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <FlatList
+                            data={selectedPostForComments?.comentarios || []}
+                            showsVerticalScrollIndicator={false}
+                            keyExtractor={(item, index) => `comment-${index}`}
+                            renderItem={({ item: comment }) => {
+                                const initials = comment.autor.split(' ').map(n => n[0]).join('').slice(0, 2)
+                                return (
+                                    <View className="border-b border-slate-100/60 px-6 py-4">
+                                        <View className="flex-row items-start">
+                                            <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-slate-800">
+                                                <Text className="text-xs font-black text-white">
+                                                    {initials}
+                                                </Text>
+                                            </View>
+                                            <View className="flex-1">
+                                                <View className="mb-1 flex-row items-center">
+                                                    <Text className="mr-2 text-sm font-bold text-slate-900">
+                                                        {comment.autor}
+                                                    </Text>
+                                                    <Text className="text-xs text-slate-400">
+                                                        há 2h
+                                                    </Text>
+                                                </View>
+                                                <Text className="text-sm leading-relaxed text-slate-600">
+                                                    {comment.texto}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                )
+                            }}
+                        />
+
+                        <View className="border-t border-slate-100 bg-white px-6 py-4">
+                            <View className="flex-row items-center rounded-2xl border border-slate-200 bg-slate-50 px-4">
+                                <View className="mr-3 h-8 w-8 items-center justify-center rounded-full bg-slate-800">
+                                    <Text className="text-xs font-black text-white">
+                                        {aluno?.nome?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'EU'}
+                                    </Text>
+                                </View>
+                                <View className="flex-1 py-3">
+                                    <Text className="text-sm text-slate-400">
+                                        Adicionar um comentário...
+                                    </Text>
+                                </View>
+                                <TouchableOpacity className="ml-2 h-8 w-8 items-center justify-center rounded-full bg-[#CC0000]">
+                                    <Feather name="send" size={14} color="#FFFFFF" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     </View>
                 </View>
             </Modal>
