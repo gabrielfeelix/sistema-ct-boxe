@@ -484,15 +484,24 @@ export default function HomeScreen() {
                             className="-mx-6 px-6"
                             contentContainerStyle={{ paddingRight: 40 }}
                         >
-                            {homeData.aulasHoje.map((aula) => (
-                                <AulaHojeItem
-                                    key={aula.id}
-                                    aula={aula}
-                                    onPress={handleAulaPress}
-                                    onAgendarOuCancelar={handleAgendarOuCancelar}
-                                    currentMinutes={currentMinutes}
-                                />
-                            ))}
+                            {homeData.aulasHoje
+                                .filter((aula) => {
+                                    // Calcular minutos da aula
+                                    const [hours, minutes] = aula.horario.split(':').map(Number)
+                                    const aulaMinutes = hours * 60 + minutes
+                                    // Mostrar apenas aulas futuras (não encerradas)
+                                    return aulaMinutes > currentMinutes
+                                })
+                                .slice(0, 10) // Limitar a 10 aulas
+                                .map((aula) => (
+                                    <AulaHojeItem
+                                        key={aula.id}
+                                        aula={aula}
+                                        onPress={handleAulaPress}
+                                        onAgendarOuCancelar={handleAgendarOuCancelar}
+                                        currentMinutes={currentMinutes}
+                                    />
+                                ))}
                         </ScrollView>
                     </View>
 
