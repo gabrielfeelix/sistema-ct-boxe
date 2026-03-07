@@ -13,26 +13,6 @@ interface State {
     errorInfo: React.ErrorInfo | null
 }
 
-// Global error handler para promise rejections não tratadas
-// Note: Em React Native, ErrorUtils já captura unhandled rejections
-// Este código é apenas para ambientes web
-if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    window.addEventListener('unhandledrejection', (event) => {
-        console.error('[ErrorBoundary] Unhandled Promise Rejection:', event.reason)
-    })
-}
-
-// Para React Native, use ErrorUtils (já incluído no RN)
-if (typeof ErrorUtils !== 'undefined') {
-    const originalHandler = ErrorUtils.getGlobalHandler()
-    ErrorUtils.setGlobalHandler((error, isFatal) => {
-        console.error('[ErrorBoundary] Global Error Handler:', error, 'isFatal:', isFatal)
-        if (originalHandler) {
-            originalHandler(error, isFatal)
-        }
-    })
-}
-
 export class ErrorBoundary extends Component<Props, State> {
     constructor(props: Props) {
         super(props)

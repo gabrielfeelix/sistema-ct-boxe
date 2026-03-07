@@ -145,7 +145,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => {
             active = false
             clearTimeout(fallbackTimeout)
-            subscription.unsubscribe()
+            if (subscription?.unsubscribe) {
+                subscription.unsubscribe()
+            }
         }
     }, [])
 
