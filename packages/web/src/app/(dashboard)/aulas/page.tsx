@@ -100,6 +100,10 @@ export default function AulasPage() {
                     tipo: 'aula',
                     titulo: 'Aula cancelada',
                     mensagem: motivo ? `A aula "${aulaCancelamento.titulo}" foi cancelada. Motivo: ${motivo}` : `A aula "${aulaCancelamento.titulo}" foi cancelada.`,
+                    acao: 'checkin',
+                    link: '/checkin',
+                    audiencia: 'aluno',
+                    icone: 'calendar-days',
                     lida: false,
                 }))
                 if (notificacoes.length > 0) await supabase.from('notificacoes').insert(notificacoes)

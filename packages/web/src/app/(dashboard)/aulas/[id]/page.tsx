@@ -101,6 +101,10 @@ export default function AulaDetalhePage() {
                     mensagem: payload.motivo
                         ? `A aula "${aula.titulo}" foi cancelada. Motivo: ${payload.motivo}`
                         : `A aula "${aula.titulo}" foi cancelada.`,
+                    acao: 'checkin',
+                    link: '/checkin',
+                    audiencia: 'aluno',
+                    icone: 'calendar-days',
                     lida: false,
                 }))
 

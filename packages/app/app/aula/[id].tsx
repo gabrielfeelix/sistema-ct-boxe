@@ -1,11 +1,10 @@
 import { Feather } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Children, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchAulaDetalhe, setPresencaStatus, type AulaDetalhe } from '@/lib/appData'
-import { toISODateLocal } from '@/lib/formatters'
+import { fetchAulaDetalhe, getAulaConfirmationInfo, setPresencaStatus, type AulaDetalhe } from '@/lib/appData'
 
 export default function AulaDetailModal() {
     const { id } = useLocalSearchParams<{ id?: string }>()
@@ -35,7 +34,7 @@ export default function AulaDetailModal() {
     }, [aluno?.id, id])
 
     useEffect(() => {
-        loadData()
+        void loadData()
     }, [loadData])
 
     const progressTotal = useMemo(() => {
@@ -46,28 +45,41 @@ export default function AulaDetailModal() {
     const isLivre = (aula?.vagas_ocupadas ?? 0) < (aula?.vagas_total ?? 0)
     const isAgendado = aula?.userStatus === 'agendado' || aula?.userStatus === 'confirmado'
     const isPresente = aula?.userStatus === 'presente'
-
-    const now = new Date()
-    const currentISO = toISODateLocal(now)
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    const classMinutes = aula ? (Number(aula.horario.split(':')[0]) * 60 + Number(aula.horario.split(':')[1])) : 0
-    const isToday = aula?.dataISO === currentISO
-    const isPassed = aula ? (aula.dataISO < currentISO || (isToday && classMinutes < currentMinutes)) : false
+    const confirmationInfo = useMemo(
+        () =>
+            aula
+                ? getAulaConfirmationInfo({
+                    dataISO: aula.dataISO,
+                    horario: aula.horario,
+                    userStatus: aula.userStatus,
+                    vagasTotal: aula.vagas_total,
+                    vagasOcupadas: aula.vagas_ocupadas,
+                })
+                : null,
+        [aula]
+    )
 
     const handleAction = async () => {
         if (!aluno?.id || !aula || saving || isPresente) return
 
+        if (!isAgendado && !confirmationInfo?.presenceActionEnabled) {
+            Alert.alert(
+                'Confirmacao indisponivel',
+                confirmationInfo?.presenceRestrictionMessage ?? 'Essa aula nao pode ser confirmada agora.'
+            )
+            return
+        }
+
         setSaving(true)
         try {
-            if (isAgendado) {
-                await setPresencaStatus(aluno.id, aula.id, 'cancelada')
-            } else {
-                await setPresencaStatus(aluno.id, aula.id, 'agendado')
-            }
+            await setPresencaStatus(aluno.id, aula.id, isAgendado ? 'cancelada' : 'agendado')
             await loadData()
         } catch (error) {
             console.error('[AulaDetalhe] Erro ao atualizar presenca:', error)
-            Alert.alert('Erro', 'Não foi possível atualizar o agendamento desta aula.')
+            Alert.alert(
+                'Erro',
+                error instanceof Error ? error.message : 'Nao foi possivel atualizar o agendamento desta aula.'
+            )
         } finally {
             setSaving(false)
         }
@@ -76,14 +88,14 @@ export default function AulaDetailModal() {
     const buttonLabel = (() => {
         if (!aula) return 'INDISPONIVEL'
         if (saving) return 'PROCESSANDO...'
-        if (isPassed) return 'AULA ENCERRADA'
+        if (confirmationInfo?.presenceActionLabel) return confirmationInfo.presenceActionLabel.toUpperCase()
         if (isPresente) return 'CHECK-IN REALIZADO'
         if (isAgendado) return 'CANCELAR AGENDAMENTO'
         if (!isLivre) return 'TURMA LOTADA'
         return 'AGENDAR AULA'
     })()
 
-    const buttonEnabled = Boolean(aula) && !saving && !isPresente && !isPassed && (isAgendado || isLivre)
+    const buttonEnabled = Boolean(aula) && !saving && !isPresente && Boolean(confirmationInfo?.presenceActionEnabled)
 
     return (
         <View className="flex-1 justify-end">
@@ -134,10 +146,14 @@ export default function AulaDetailModal() {
 
                                 <View className="mb-6 flex-row items-center border-y border-slate-100 py-5">
                                     <View className="mr-4 h-12 w-12 items-center justify-center rounded-full border border-slate-100 bg-slate-50">
-                                        <Text className="text-lg font-black text-slate-600">{aula.professor.slice(0, 2).toUpperCase()}</Text>
+                                        <Text className="text-lg font-black text-slate-600">
+                                            {aula.professor.slice(0, 2).toUpperCase()}
+                                        </Text>
                                     </View>
                                     <View>
-                                        <Text className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Instrutor</Text>
+                                        <Text className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            Instrutor
+                                        </Text>
                                         <Text className="text-base font-bold tracking-tight text-slate-900">{aula.professor}</Text>
                                     </View>
                                 </View>
@@ -166,21 +182,23 @@ export default function AulaDetailModal() {
                                     {aula.confirmados.length > 0 ? (
                                         <View className="flex-row items-center">
                                             <View className="mr-4 flex-row -space-x-4">
-                                                {Children.toArray(
-                                                    aula.confirmados.slice(0, 5).map((nome) => {
-                                                        const iniciais = nome
-                                                            .split(' ')
-                                                            .map((part) => part[0])
-                                                            .join('')
-                                                            .substring(0, 2)
-                                                            .toUpperCase()
-                                                        return (
-                                                            <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#CC0000]">
-                                                                <Text className="text-[10px] font-black text-white">{iniciais}</Text>
-                                                            </View>
-                                                        )
-                                                    })
-                                                )}
+                                                {aula.confirmados.slice(0, 5).map((nome, index) => {
+                                                    const iniciais = nome
+                                                        .split(' ')
+                                                        .map((part) => part[0])
+                                                        .join('')
+                                                        .substring(0, 2)
+                                                        .toUpperCase()
+
+                                                    return (
+                                                        <View
+                                                            key={`${nome}-${index}`}
+                                                            className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#CC0000]"
+                                                        >
+                                                            <Text className="text-[10px] font-black text-white">{iniciais}</Text>
+                                                        </View>
+                                                    )
+                                                })}
                                             </View>
                                             <Text className="text-sm font-medium text-slate-500" numberOfLines={1}>
                                                 {aula.confirmados[0]}
@@ -199,18 +217,18 @@ export default function AulaDetailModal() {
                                     disabled={!buttonEnabled}
                                     onPress={handleAction}
                                     className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${buttonEnabled
-                                            ? isAgendado
-                                                ? 'border border-red-200 bg-red-50 shadow-red-900/10'
-                                                : 'bg-slate-900 shadow-slate-900/30'
-                                            : 'border border-slate-200 bg-slate-100'
+                                        ? isAgendado
+                                            ? 'border border-red-200 bg-red-50 shadow-red-900/10'
+                                            : 'bg-slate-900 shadow-slate-900/30'
+                                        : 'border border-slate-200 bg-slate-100'
                                         }`}
                                 >
                                     <Text
                                         className={`text-base font-black uppercase tracking-widest ${buttonEnabled
-                                                ? isAgendado
-                                                    ? 'text-red-700'
-                                                    : 'text-white'
-                                                : 'text-slate-400'
+                                            ? isAgendado
+                                                ? 'text-red-700'
+                                                : 'text-white'
+                                            : 'text-slate-400'
                                             }`}
                                     >
                                         {buttonLabel}

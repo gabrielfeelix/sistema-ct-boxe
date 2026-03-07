@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, Video as VideoIcon, Layers, FileText } from 'lucide-react'
+import { ArrowLeft, Upload, Video as VideoIcon, Layers, FileText, Image as ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -15,6 +15,7 @@ export default function NovoVideoTrilhaPage() {
     const [descricao, setDescricao] = useState('')
     const [categoria, setCategoria] = useState('')
     const [novaCategoria, setNovaCategoria] = useState('')
+    const [capaUrl, setCapaUrl] = useState('')
     const [videoUrl, setVideoUrl] = useState('')
     const [ordem, setOrdem] = useState(0)
     const [salvando, setSalvando] = useState(false)
@@ -22,6 +23,7 @@ export default function NovoVideoTrilhaPage() {
 
     // Upload Supabase Storage
     const [uploadando, setUploadando] = useState(false)
+    const [uploadandoCapa, setUploadandoCapa] = useState(false)
     const [criandoCat, setCriandoCat] = useState(false)
 
 
@@ -41,6 +43,7 @@ export default function NovoVideoTrilhaPage() {
 
         const { data, error } = await supabase.from('trilhas_categorias').insert({
             nome: novaCategoria.trim(),
+            capa_url: capaUrl || null,
             ativo: true
         }).select('id').single()
 
@@ -51,8 +54,42 @@ export default function NovoVideoTrilhaPage() {
             await fetchCats()
             setCategoria(data.id)
             setNovaCategoria('')
+            setCapaUrl('')
         }
         setCriandoCat(false)
+    }
+
+    async function handleUploadCapa(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (!file.type.startsWith('image/')) {
+            toast.error('Selecione uma imagem valida para a capa.')
+            return
+        }
+
+        setUploadandoCapa(true)
+
+        const ext = file.name.split('.').pop()
+        const path = `trilhas/capas/${Date.now()}.${ext}`
+
+        const { error } = await supabase.storage
+            .from('ct-boxe-media')
+            .upload(path, file, {
+                cacheControl: '3600',
+                upsert: true
+            })
+
+        if (error) {
+            console.error('Storage Cover Upload Error:', error)
+            toast.error('Erro ao enviar capa.')
+            setUploadandoCapa(false)
+            return
+        }
+
+        const { data } = supabase.storage.from('ct-boxe-media').getPublicUrl(path)
+        setCapaUrl(data.publicUrl)
+        setUploadandoCapa(false)
+        toast.success('Capa enviada com sucesso!')
     }
 
     async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -202,6 +239,37 @@ export default function NovoVideoTrilhaPage() {
                                 >
                                     {criandoCat ? '...' : 'Confirmar'}
                                 </button>
+                            </div>
+                        )}
+                        {categoria === 'nova' && (
+                            <div className="mt-4">
+                                <label className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2 mb-3">
+                                    <ImageIcon className="w-4 h-4 text-gray-400" /> Capa do MÃ³dulo
+                                </label>
+                                {!capaUrl ? (
+                                    <label className="flex cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-white p-6 text-center hover:border-[#CC0000] hover:bg-red-50/40">
+                                        <div>
+                                            <p className="text-sm font-black text-gray-900">
+                                                {uploadandoCapa ? 'Enviando capa...' : 'Selecionar imagem da capa'}
+                                            </p>
+                                            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                                JPG ou PNG
+                                            </p>
+                                        </div>
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleUploadCapa} />
+                                    </label>
+                                ) : (
+                                    <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                                        <img src={capaUrl} alt="Capa do mÃ³dulo" className="h-40 w-full object-cover" />
+                                        <button
+                                            type="button"
+                                            onClick={() => setCapaUrl('')}
+                                            className="absolute right-3 top-3 rounded-lg bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-900"
+                                        >
+                                            Remover
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

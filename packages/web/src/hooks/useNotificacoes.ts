@@ -13,7 +13,7 @@ export interface NotificacaoItem extends Notificacao {
     aluno?: NotificacaoAluno | null
 }
 
-export function useNotificacoes(professor?: { nome: string, role: string }) {
+export function useNotificacoes(professor?: { nome: string; role: string }) {
     const [notificacoes, setNotificacoes] = useState<NotificacaoItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -23,18 +23,15 @@ export function useNotificacoes(professor?: { nome: string, role: string }) {
         setLoading(true)
         setError(null)
 
-        let query = supabase
+        const { data, error: queryError } = await supabase
             .from('notificacoes')
-            .select('id,titulo,subtitulo,mensagem,tipo,lida,aluno_id,acao,link,created_at,updated_at,aluno:alunos(nome,email)')
+            .select(
+                'id,titulo,subtitulo,mensagem,tipo,lida,aluno_id,acao,link,audiencia,professor_nome,icone,created_at,updated_at,aluno:alunos(nome,email)'
+            )
             .order('created_at', { ascending: false })
 
-        // Se não for super admin e for professor, filtra os resultados no client
-        // (Ou poderíamos filtrar no server se tivéssemos a coluna professor_id)
-
-        const { data, error: queryError } = await query
-
         if (queryError) {
-            setError('Não foi possível carregar as notificacoes.')
+            setError('Não foi possível carregar as notificações.')
             setNotificacoes([])
             setLoading(false)
             return
@@ -42,50 +39,47 @@ export function useNotificacoes(professor?: { nome: string, role: string }) {
 
         let results = (data as NotificacaoItem[]) ?? []
 
-        // Filtro lógico para Professores (não super-admin)
         if (professor && professor.role === 'professor') {
-            const nomeProf = (professor.nome || '').toLowerCase()
-            results = results.filter(n => {
-                const msg = (n.mensagem || '').toLowerCase()
-                const sub = (n.subtitulo || '').toLowerCase()
-                const titulo = (n.titulo || '').toLowerCase()
-
-                return msg.includes(nomeProf) || sub.includes(nomeProf) || titulo.includes(nomeProf) || n.tipo === 'ct'
+            const nomeProf = (professor.nome || '').trim().toLowerCase()
+            results = results.filter((item) => {
+                const audiencia = (item.audiencia ?? 'aluno').toLowerCase()
+                const alvoProfessor = (item.professor_nome ?? '').trim().toLowerCase()
+                return audiencia === 'professor' && (!alvoProfessor || alvoProfessor === nomeProf)
             })
         }
 
         setNotificacoes(results)
         setLoading(false)
-    }, [supabase, professor?.nome, professor?.role])
+    }, [professor, supabase])
 
     useEffect(() => {
         fetch()
     }, [fetch])
 
     const naoLidas = useMemo(() => notificacoes.filter((item) => !item.lida).length, [notificacoes])
-    const naoLidasInbox = useMemo(() => notificacoes.filter((item) => !item.lida && item.tipo === 'ct').length, [notificacoes])
-    const naoLidasAlertas = useMemo(() => notificacoes.filter((item) => !item.lida && item.tipo !== 'ct').length, [notificacoes])
+    const naoLidasInbox = useMemo(
+        () => notificacoes.filter((item) => !item.lida && (item.audiencia ?? 'aluno') === 'aluno').length,
+        [notificacoes]
+    )
+    const naoLidasAlertas = useMemo(
+        () => notificacoes.filter((item) => !item.lida && (item.audiencia ?? 'aluno') !== 'aluno').length,
+        [notificacoes]
+    )
 
     async function marcarComoLida(id: string, lida: boolean) {
-        const { error: updateError } = await supabase
-            .from('notificacoes')
-            .update({ lida })
-            .eq('id', id)
+        const { error: updateError } = await supabase.from('notificacoes').update({ lida }).eq('id', id)
 
         if (updateError) return false
 
-        setNotificacoes((prev) =>
-            prev.map((item) => (item.id === id ? { ...item, lida } : item))
-        )
-
+        setNotificacoes((prev) => prev.map((item) => (item.id === id ? { ...item, lida } : item)))
         return true
     }
 
     async function marcarTodasComoLidas() {
-        const { error: updateError } = await supabase
-            .from('notificacoes')
-            .update({ lida: true })
-            .eq('lida', false)
+        const idsNaoLidos = notificacoes.filter((item) => !item.lida).map((item) => item.id)
+        if (idsNaoLidos.length === 0) return true
+
+        const { error: updateError } = await supabase.from('notificacoes').update({ lida: true }).in('id', idsNaoLidos)
 
         if (updateError) return false
 

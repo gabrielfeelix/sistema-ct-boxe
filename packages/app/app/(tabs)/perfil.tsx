@@ -234,11 +234,11 @@ export default function PerfilScreen() {
 
                     <View className="mb-8">
                         <Text className="mb-6 text-xl font-bold tracking-tight text-slate-900">Nossa Comunidade</Text>
-                        <View className="flex-row items-center justify-between">
+                        <View className="flex-row flex-wrap justify-between">
                             <TouchableOpacity
                                 activeOpacity={0.7}
                                 onPress={() => openLink('whatsapp://send?phone=5541999999999')}
-                                className="h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
+                                className="mb-4 h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
                             >
                                 <Image
                                     source={require('../../assets/whatsapp.png')}
@@ -250,8 +250,8 @@ export default function PerfilScreen() {
 
                             <TouchableOpacity
                                 activeOpacity={0.7}
-                                onPress={() => openLink('https://instagram.com/ctargelriboli')}
-                                className="h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
+                                onPress={() => openLink('https://www.instagram.com/ctdeboxe/')}
+                                className="mb-4 h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
                             >
                                 <Image
                                     source={require('../../assets/instagram.png')}
@@ -259,6 +259,36 @@ export default function PerfilScreen() {
                                     resizeMode="contain"
                                 />
                                 <Text className="text-xs font-bold text-slate-900">Instagram</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => openLink('https://www.youtube.com/channel/UCmT-2WRp5hHsVG76pyzBdVg')}
+                                className="h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
+                            >
+                                <Image
+                                    source={require('../../assets/youtube.png')}
+                                    style={{ width: 32, height: 32, marginBottom: 8 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="text-xs font-bold text-slate-900">YouTube</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() =>
+                                    openLink(
+                                        'https://www.google.com/search?sca_esv=cd133ae2d49e3551&sxsrf=ANbL-n6lp0fJL6gS_UYNIMQCTcfQ7fwf5g:1772902302261&si=AL3DRZEsmMGCryMMFSHJ3StBhOdZ2-6yYkXd_doETEE1OR-qOZkEe32gZ7vxc8she4gdIEjlUMLPKYIa6IFZ27xy04atc-V203oPvCnNVu882bKSg-LLHqcyt78UxYWIbrQR-qkFCo0Nm8KYzmojF37tOsqtMcUMXlbrfzmhPtn6Ge0poG4wMo_KxETN26FaqRUT0GLoBy3G&q=Centro+de+Treinamento+de+Boxe+Equipe+Argel+Riboli+Coment%C3%A1rios&sa=X&ved=2ahUKEwjImMrfn46TAxV6kJUCHcOmF0sQ0bkNegQILxAH&biw=1536&bih=730&dpr=1.25'
+                                    )
+                                }
+                                className="h-28 w-[48%] items-center justify-center rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/40"
+                            >
+                                <Image
+                                    source={require('../../assets/google.png')}
+                                    style={{ width: 32, height: 32, marginBottom: 8 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="text-xs font-bold text-slate-900">Avaliar no Google</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

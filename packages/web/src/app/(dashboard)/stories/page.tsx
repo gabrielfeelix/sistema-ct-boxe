@@ -12,6 +12,7 @@ type TrilhaCategoria = {
     id: string
     nome: string
     ordem: number
+    capa_url?: string | null
 }
 
 type TrilhaVideo = {
@@ -166,8 +167,14 @@ export default function TrilhasPage() {
                                     onClick={() => toggleCollapse(cat.id)}
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="p-3 rounded-2xl bg-gray-100 text-gray-500">
-                                            <FolderOpen className="w-6 h-6" />
+                                        <div className="h-14 w-14 overflow-hidden rounded-2xl bg-gray-100 text-gray-500">
+                                            {cat.capa_url ? (
+                                                <img src={cat.capa_url} alt={cat.nome} className="h-full w-full object-cover" />
+                                            ) : (
+                                                <div className="flex h-full w-full items-center justify-center">
+                                                    <FolderOpen className="w-6 h-6" />
+                                                </div>
+                                            )}
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-black text-gray-900 tracking-tight">{cat.nome}</h3>

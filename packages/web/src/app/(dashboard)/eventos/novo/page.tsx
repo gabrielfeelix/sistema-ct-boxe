@@ -7,9 +7,11 @@ import { toast } from 'sonner'
 import { EventoForm } from '@/components/eventos/EventoForm'
 import { useEventos } from '@/hooks/useEventos'
 import type { EventoFormValues } from '@/lib/validations/evento'
+import { createClient } from '@/lib/supabase/client'
 
 export default function NovoEventoPage() {
     const router = useRouter()
+    const supabase = createClient()
     const { criarEvento } = useEventos()
     const [saving, setSaving] = useState(false)
 
@@ -21,6 +23,28 @@ export default function NovoEventoPage() {
         if (error) {
             toast.error(error)
             return
+        }
+
+        const dateLabel = new Date(values.data_evento).toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        })
+
+        const { error: notifyError } = await supabase.from('notificacoes').insert({
+            titulo: 'Novo evento disponivel',
+            subtitulo: `${values.titulo} foi publicado para os alunos`,
+            mensagem: `${dateLabel}${values.local ? ` • ${values.local}` : ''}`,
+            tipo: 'evento',
+            acao: 'evento',
+            link: '/eventos',
+            audiencia: 'aluno',
+            icone: 'party-popper',
+            lida: false,
+        })
+
+        if (notifyError) {
+            toast.warning('Evento criado, mas a notificacao para os alunos nao foi enviada.')
         }
 
         toast.success('Evento criado com sucesso.')

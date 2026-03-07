@@ -6,6 +6,7 @@ import { supabase } from './supabase'
 import type {
     AlunoProfile,
     AppAula,
+    AulaConfirmationState,
     ContractBannerStatus,
     DocumentoAluno,
     EventoApp,
@@ -13,6 +14,7 @@ import type {
     FeedPost,
     HomeNotification,
     HomeStory,
+    HomeStoryVideo,
 } from '@/lib/types'
 
 export interface HomeAviso {
@@ -26,13 +28,24 @@ export interface HomeData {
     stories: HomeStory[]
     notificacoesNaoLidas: number
     avisos: HomeAviso[]
-    aulasHoje: AppAula[]
+    proximasAulas: AppAula[]
     proximaAula: AppAula | null
 }
 
-export interface CheckinData {
-    hoje: AppAula[]
-    amanha: AppAula[]
+export interface AgendaDaySummary {
+    iso: string
+    label: string
+    shortLabel: string
+    dayNumber: number
+    isToday: boolean
+    hasClasses: boolean
+}
+
+export interface AgendaData {
+    selectedDateISO: string
+    selectedLabel: string
+    dias: AgendaDaySummary[]
+    aulas: AppAula[]
     proximaAula: AppAula | null
 }
 
@@ -128,10 +141,217 @@ function getTomorrowISO() {
     return toISODateLocal(tomorrow)
 }
 
+function buildNextDays(count: number) {
+    const labels = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB']
+    return Array.from({ length: count }).map((_, index) => {
+        const date = new Date()
+        date.setDate(date.getDate() + index)
+        const iso = toISODateLocal(date)
+        return {
+            iso,
+            date,
+            dayNumber: date.getDate(),
+            isToday: index === 0,
+            shortLabel: index === 0 ? 'HOJE' : index === 1 ? 'AMANHA' : labels[date.getDay()],
+            label: toBRDate(date),
+        }
+    })
+}
+
+function mapNotificationActionLabel(tipo: string, acao?: string | null) {
+    const normalizedType = tipo.toLowerCase()
+    const normalizedAction = (acao ?? '').toLowerCase()
+
+    if (normalizedAction === 'pagamento') return 'Pagar agora'
+    if (normalizedAction === 'assistir_video' || normalizedAction === 'stories') return 'Assistir video'
+    if (normalizedAction === 'checkin' || normalizedAction === 'evento') return 'Ver detalhes'
+    if (normalizedType === 'pagamento') return 'Pagar agora'
+    if (normalizedType === 'video') return 'Assistir video'
+    if (normalizedType === 'aula') return 'Ver aula'
+    return 'Abrir'
+}
+
+type NotificationAudience = 'aluno' | 'gestao' | 'professor'
+
+type NotificationInsertPayload = {
+    aluno_id?: string | null
+    tipo: string
+    titulo: string
+    subtitulo?: string | null
+    mensagem?: string | null
+    acao?: string | null
+    link?: string | null
+    audiencia?: NotificationAudience
+    professor_nome?: string | null
+    icone?: string | null
+}
+
+async function insertNotification(payload: NotificationInsertPayload) {
+    const { error } = await supabase.from('notificacoes').insert({
+        aluno_id: payload.aluno_id ?? null,
+        tipo: payload.tipo,
+        titulo: payload.titulo,
+        subtitulo: payload.subtitulo ?? null,
+        mensagem: payload.mensagem ?? null,
+        acao: payload.acao ?? null,
+        link: payload.link ?? null,
+        audiencia: payload.audiencia ?? 'aluno',
+        professor_nome: payload.professor_nome ?? null,
+        icone: payload.icone ?? null,
+        lida: false,
+    })
+
+    if (error) {
+        console.error('[Notificacoes] Erro ao inserir notificacao:', error.message)
+    }
+}
+
 function horaToMinutes(hora: string) {
     if (!hora || !hora.includes(':')) return 0
     const [h, m] = hora.split(':').map(Number)
     return (h || 0) * 60 + (m || 0)
+}
+
+type AulaConfirmationInfo = {
+    state: AulaConfirmationState
+    presenceActionEnabled: boolean
+    presenceStatusLabel: string
+    presenceActionLabel: string
+    presenceRestrictionMessage: string | null
+}
+
+type AulaConfirmationInput = {
+    dataISO: string
+    horario: string
+    userStatus?: string | null
+    vagasTotal: number
+    vagasOcupadas: number
+}
+
+function buildAulaDateTime(dataISO: string, horario: string) {
+    if (!dataISO || !horario || !horario.includes(':')) return null
+    const [hour, minute] = horario.split(':').map(Number)
+    const [year, month, day] = dataISO.split('-').map(Number)
+
+    if (![year, month, day, hour, minute].every((part) => Number.isFinite(part))) {
+        return null
+    }
+
+    return new Date(year, month - 1, day, hour, minute, 0, 0)
+}
+
+export function getAulaConfirmationInfo({
+    dataISO,
+    horario,
+    userStatus,
+    vagasTotal,
+    vagasOcupadas,
+}: AulaConfirmationInput): AulaConfirmationInfo {
+    const isBooked = userStatus === 'agendado' || userStatus === 'confirmado'
+    const isCheckedIn = userStatus === 'presente'
+    const isFull = vagasTotal > 0 && vagasOcupadas >= vagasTotal && !isBooked && !isCheckedIn
+    const aulaDateTime = buildAulaDateTime(dataISO, horario)
+
+    if (!aulaDateTime) {
+        return {
+            state: 'past',
+            presenceActionEnabled: false,
+            presenceStatusLabel: 'Indisponivel',
+            presenceActionLabel: 'Indisponivel',
+            presenceRestrictionMessage: 'Nao foi possivel validar o horario desta aula.',
+        }
+    }
+
+    const diffMinutes = Math.floor((aulaDateTime.getTime() - Date.now()) / (1000 * 60))
+
+    if (isCheckedIn) {
+        return {
+            state: 'checked_in',
+            presenceActionEnabled: false,
+            presenceStatusLabel: 'Check-in',
+            presenceActionLabel: 'Check-in realizado',
+            presenceRestrictionMessage: null,
+        }
+    }
+
+    if (isBooked) {
+        return {
+            state: 'booked',
+            presenceActionEnabled: diffMinutes > 0,
+            presenceStatusLabel: 'Confirmada',
+            presenceActionLabel: diffMinutes > 0 ? 'Cancelar presenca' : 'Aula encerrada',
+            presenceRestrictionMessage: diffMinutes > 0 ? null : 'A aula ja foi encerrada.',
+        }
+    }
+
+    if (diffMinutes <= 0) {
+        return {
+            state: 'past',
+            presenceActionEnabled: false,
+            presenceStatusLabel: 'Encerrada',
+            presenceActionLabel: 'Aula encerrada',
+            presenceRestrictionMessage: 'A aula ja foi encerrada.',
+        }
+    }
+
+    if (isFull) {
+        return {
+            state: 'full',
+            presenceActionEnabled: false,
+            presenceStatusLabel: 'Lotada',
+            presenceActionLabel: 'Sem vagas',
+            presenceRestrictionMessage: 'Essa turma esta lotada no momento.',
+        }
+    }
+
+    if (diffMinutes > 24 * 60) {
+        return {
+            state: 'too_early',
+            presenceActionEnabled: false,
+            presenceStatusLabel: 'Indisponivel',
+            presenceActionLabel: 'Indisponivel',
+            presenceRestrictionMessage: 'Voce so pode confirmar uma aula nas 24 horas anteriores.',
+        }
+    }
+
+    if (diffMinutes <= 30) {
+        return {
+            state: 'too_late',
+            presenceActionEnabled: false,
+            presenceStatusLabel: 'Indisponivel',
+            presenceActionLabel: 'Indisponivel',
+            presenceRestrictionMessage: 'A confirmacao precisa ser feita com pelo menos 30 minutos de antecedencia.',
+        }
+    }
+
+    return {
+        state: 'available',
+        presenceActionEnabled: true,
+        presenceStatusLabel: 'Disponivel',
+        presenceActionLabel: 'Confirmar presenca',
+        presenceRestrictionMessage: null,
+    }
+}
+
+function decorateAulaWithConfirmation(aula: AppAula, userStatus?: string | null): AppAula {
+    const confirmation = getAulaConfirmationInfo({
+        dataISO: aula.dataISO,
+        horario: aula.horario,
+        userStatus,
+        vagasTotal: aula.vagas_total,
+        vagasOcupadas: aula.vagas_ocupadas,
+    })
+
+    return {
+        ...aula,
+        agendado: userStatus === 'agendado' || userStatus === 'confirmado',
+        presente: userStatus === 'presente',
+        confirmationState: confirmation.state,
+        presenceActionEnabled: confirmation.presenceActionEnabled,
+        presenceStatusLabel: confirmation.presenceStatusLabel,
+        presenceActionLabel: confirmation.presenceActionLabel,
+        presenceRestrictionMessage: confirmation.presenceRestrictionMessage,
+    }
 }
 
 const COUNTED_PRESENCA_STATUSES = ['agendado', 'presente', 'confirmado']
@@ -244,11 +464,7 @@ async function fetchAulasWithPresence(alunoId: string, dateISO: string) {
         const id = String(row.id)
         const mapped = mapAula(row, ocupacaoByAula[id] ?? 0)
         const userStatus = userStatusByAula[id]
-        return {
-            ...mapped,
-            agendado: userStatus === 'agendado' || userStatus === 'confirmado',
-            presente: userStatus === 'presente',
-        }
+        return decorateAulaWithConfirmation(mapped, userStatus)
     })
 
     return { aulas, userStatusByAula }
@@ -279,16 +495,27 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
     const now = new Date()
     const nowMinutes = now.getHours() * 60 + now.getMinutes()
 
-    // Buscar proximas aulas (futuras apenas, proximos 7 dias)
+    // Buscar proximas aulas reais (futuras apenas, suficiente para compor as proximas 7 aulas)
     const futureDate = new Date()
-    futureDate.setDate(futureDate.getDate() + 7)
+    futureDate.setDate(futureDate.getDate() + 60)
     const futureDateISO = toISODateLocal(futureDate)
 
-    const [storiesRes, notifsRes, postsRes, aulasRes] = await Promise.allSettled([
-        supabase.from('stories_ativos').select('*').order('created_at', { ascending: false }),
+    const [categoriasRes, videosRes, notifsRes, postsRes, aulasRes] = await Promise.allSettled([
+        supabase
+            .from('trilhas_categorias')
+            .select('*')
+            .eq('ativo', true)
+            .order('ordem', { ascending: true })
+            .order('created_at', { ascending: true }),
+        supabase
+            .from('trilhas_videos')
+            .select('*')
+            .eq('ativo', true)
+            .order('ordem', { ascending: true })
+            .order('created_at', { ascending: true }),
         supabase
             .from('notificacoes')
-            .select('id', { count: 'exact' })
+            .select('id, audiencia')
             .or(`aluno_id.eq.${alunoId},aluno_id.is.null`)
             .eq('lida', false),
         supabase
@@ -305,22 +532,38 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
             .neq('status', 'cancelada')
             .order('data', { ascending: true })
             .order('hora_inicio', { ascending: true })
-            .limit(15),
+            .limit(120),
     ])
 
-    const storiesRows =
-        storiesRes.status === 'fulfilled'
-            ? ((storiesRes.value.data as Record<string, unknown>[]) ?? [])
+    const categoriaRows =
+        categoriasRes.status === 'fulfilled'
+            ? ((categoriasRes.value.data as Record<string, unknown>[]) ?? [])
             : []
-    if (storiesRes.status === 'fulfilled' && storiesRes.value.error) {
-        console.error('[Home] Erro ao buscar stories:', storiesRes.value.error.message)
+    if (categoriasRes.status === 'fulfilled' && categoriasRes.value.error) {
+        console.error('[Home] Erro ao buscar categorias de trilhas:', categoriasRes.value.error.message)
     }
-    if (storiesRes.status === 'rejected') {
-        console.error('[Home] Falha de rede ao buscar stories:', storiesRes.reason)
+    if (categoriasRes.status === 'rejected') {
+        console.error('[Home] Falha de rede ao buscar categorias de trilhas:', categoriasRes.reason)
+    }
+
+    const videoRows =
+        videosRes.status === 'fulfilled'
+            ? ((videosRes.value.data as Record<string, unknown>[]) ?? [])
+            : []
+    if (videosRes.status === 'fulfilled' && videosRes.value.error) {
+        console.error('[Home] Erro ao buscar videos das trilhas:', videosRes.value.error.message)
+    }
+    if (videosRes.status === 'rejected') {
+        console.error('[Home] Falha de rede ao buscar videos das trilhas:', videosRes.reason)
     }
 
     const notificacoesNaoLidas =
-        notifsRes.status === 'fulfilled' ? (notifsRes.value.count ?? 0) : 0
+        notifsRes.status === 'fulfilled'
+            ? (((notifsRes.value.data as Array<{ audiencia?: string | null }>) ?? []).filter((item) => {
+                const audience = String(item.audiencia ?? 'aluno').toLowerCase()
+                return audience !== 'gestao' && audience !== 'professor'
+            }).length)
+            : 0
     if (notifsRes.status === 'fulfilled' && notifsRes.value.error) {
         console.error('[Home] Erro ao buscar notificacoes:', notifsRes.value.error.message)
     }
@@ -374,33 +617,72 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
         const id = String(row.id)
         const mapped = mapAula(row, ocupacaoByAula[id] ?? 0)
         const userStatus = userStatusByAula[id]
-        return {
-            ...mapped,
-            agendado: userStatus === 'agendado' || userStatus === 'confirmado',
-            presente: userStatus === 'presente',
-            data: String(row.data),
-        }
+        return decorateAulaWithConfirmation(mapped, userStatus)
     })
 
     // Filtrar apenas aulas futuras (data > hoje OU (data === hoje E hora >= agora))
     const aulasFuturas = allAulas.filter((aula) => {
-        if (aula.data > todayISO) return true
-        if (aula.data === todayISO && horaToMinutes(aula.horario) >= nowMinutes) return true
+        if (aula.dataISO > todayISO) return true
+        if (aula.dataISO === todayISO && horaToMinutes(aula.horario) >= nowMinutes) return true
         return false
     })
 
-    // Pegar as proximas 10 aulas
-    const aulasHoje = aulasFuturas.slice(0, 10)
+    const proximasAulas = aulasFuturas.slice(0, 7)
     const proximaAula = aulasFuturas[0] ?? null
 
-    const stories = storiesRows.map((row) => ({
-        id: String(row.id),
-        nome: String(row.autor ?? 'CT Boxe'),
-        thumbnail: (row.imagem_url as string) ?? null,
-        assistido: false,
-        duracao: Number(row.duracao ?? 15),
-        created_at: (row.created_at as string) ?? null,
-    })) as HomeStory[]
+    const videosByCategoria: Record<string, HomeStoryVideo[]> = {}
+    videoRows.forEach((row) => {
+        const categoriaId = String(row.categoria_id ?? '')
+        if (!categoriaId) return
+
+        const thumbnail =
+            (row.thumbnail_url as string) ??
+            (row.capa_url as string) ??
+            (row.preview_url as string) ??
+            null
+
+        const mappedVideo: HomeStoryVideo = {
+            id: String(row.id),
+            titulo: String(row.titulo ?? 'Video do CT'),
+            descricao: (row.descricao as string) ?? null,
+            video_url: String(row.video_url ?? ''),
+            thumbnail,
+            duracao: Number(row.duracao ?? 15),
+            created_at: (row.created_at as string) ?? null,
+        }
+
+        videosByCategoria[categoriaId] = videosByCategoria[categoriaId]
+            ? [...videosByCategoria[categoriaId], mappedVideo]
+            : [mappedVideo]
+    })
+
+    const stories = categoriaRows
+        .map((row) => {
+            const categoriaId = String(row.id)
+            const videos = videosByCategoria[categoriaId] ?? []
+            if (videos.length === 0) return null
+
+            const createdAt = (row.created_at as string) ?? videos[0]?.created_at ?? null
+            const storyDate = createdAt ? new Date(createdAt) : null
+            const storyAgeDays = storyDate
+                ? Math.floor((Date.now() - storyDate.getTime()) / (1000 * 60 * 60 * 24))
+                : 999
+
+            return {
+                id: categoriaId,
+                nome: String(row.nome ?? 'Trilha do CT'),
+                capa_url:
+                    (row.capa_url as string) ??
+                    (row.thumbnail_url as string) ??
+                    videos[0]?.thumbnail ??
+                    null,
+                tem_novo: storyAgeDays <= 30,
+                total_videos: videos.length,
+                created_at: createdAt,
+                videos,
+            } satisfies HomeStory
+        })
+        .filter(Boolean) as HomeStory[]
 
     const avisos = postsRows.map((row) => {
         const texto = String(row.conteudo ?? '')
@@ -418,7 +700,7 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
         stories,
         notificacoesNaoLidas,
         avisos,
-        aulasHoje,
+        proximasAulas,
         proximaAula,
     }
 }
@@ -428,6 +710,45 @@ export async function setPresencaStatus(
     aulaId: string,
     status: 'agendado' | 'presente' | 'cancelada'
 ) {
+    if (status === 'agendado') {
+        const aulaRes = await supabase
+            .from('aulas')
+            .select('id, data, hora_inicio, horario, vagas_total, capacidade_maxima, vagas, maximo_alunos, status')
+            .eq('id', aulaId)
+            .single()
+
+        if (aulaRes.error || !aulaRes.data) {
+            throw new Error(`Nao foi possivel validar a aula: ${aulaRes.error?.message ?? 'aula nao encontrada'}`)
+        }
+
+        const ocupacaoRes = await supabase
+            .from('presencas')
+            .select('aula_id, aluno_id, status, updated_at, created_at')
+            .eq('aula_id', aulaId)
+
+        if (ocupacaoRes.error) {
+            throw new Error(`Nao foi possivel validar vagas: ${ocupacaoRes.error.message}`)
+        }
+
+        const presencasRows = (ocupacaoRes.data as PresencaRow[]) ?? []
+        const { ocupacaoByAula, userStatusByAula } = buildPresenceMaps(presencasRows, alunoId)
+        const aulaMapeada = mapAula(
+            aulaRes.data as unknown as Record<string, unknown>,
+            ocupacaoByAula[aulaId] ?? 0
+        )
+        const confirmation = getAulaConfirmationInfo({
+            dataISO: aulaMapeada.dataISO,
+            horario: aulaMapeada.horario,
+            userStatus: userStatusByAula[aulaId],
+            vagasTotal: aulaMapeada.vagas_total,
+            vagasOcupadas: aulaMapeada.vagas_ocupadas,
+        })
+
+        if (confirmation.state !== 'available' && confirmation.state !== 'booked') {
+            throw new Error(confirmation.presenceRestrictionMessage ?? 'Essa aula nao pode ser confirmada agora.')
+        }
+    }
+
     const existing = await supabase
         .from('presencas')
         .select('id, status')
@@ -470,34 +791,73 @@ export async function setPresencaStatus(
     }
 
     // Se virou check-in (presente), notifica o admin/professor
-    if (status === 'presente' && !wasPresente) {
+if (status === 'presente' && !wasPresente) {
         const { data: aluno } = await supabase.from('alunos').select('nome').eq('id', alunoId).single()
         const { data: aula } = await supabase.from('aulas').select('nome, professor').eq('id', aulaId).single()
 
         if (aluno && aula) {
-            await supabase.from('notificacoes').insert({
-                titulo: 'Novo Check-in realizado',
-                subtitulo: `${aluno.nome} entrou na aula`,
-                mensagem: `${aluno.nome} confirmou presença na aula "${aula.nome}" com ${aula.professor}`,
-                tipo: 'aula',
-                lida: false,
-                acao: 'checkin',
-                link: `/aulas/${aulaId}`
-            })
+            await Promise.all([
+                insertNotification({
+                    tipo: 'aula',
+                    titulo: 'Novo check-in realizado',
+                    subtitulo: `${aluno.nome} entrou na aula`,
+                    mensagem: `${aluno.nome} confirmou presenca na aula "${aula.nome}" com ${aula.professor}.`,
+                    acao: 'checkin',
+                    link: `/aulas/${aulaId}`,
+                    audiencia: 'gestao',
+                    icone: 'user-check',
+                }),
+                insertNotification({
+                    tipo: 'aula',
+                    titulo: 'Aluno confirmado na sua aula',
+                    subtitulo: `${aluno.nome} entrou na aula`,
+                    mensagem: `${aluno.nome} confirmou presenca na aula "${aula.nome}".`,
+                    acao: 'checkin',
+                    link: `/aulas/${aulaId}`,
+                    audiencia: 'professor',
+                    professor_nome: String(aula.professor ?? ''),
+                    icone: 'user-check',
+                }),
+            ])
         }
     }
 }
 
-export async function fetchCheckinData(alunoId: string): Promise<CheckinData> {
-    const [hoje, amanha, proximaAula] = await Promise.all([
-        fetchAulasWithPresence(alunoId, getTodayISO()),
-        fetchAulasWithPresence(alunoId, getTomorrowISO()),
-        getProximaAula(alunoId),
-    ])
+export async function fetchAgendaData(alunoId: string, selectedDateISO: string): Promise<AgendaData> {
+    const diasBase = buildNextDays(7)
+    const requestedDate = selectedDateISO || diasBase[0]?.iso || getTodayISO()
+
+    const shouldAppendRequested = !diasBase.some((dia) => dia.iso === requestedDate)
+    const daysToFetch = shouldAppendRequested
+        ? [...diasBase, { ...buildNextDays(1)[0], iso: requestedDate, label: toBRDate(requestedDate) }]
+        : diasBase
+
+    const dateSet = [...new Set(daysToFetch.map((dia) => dia.iso))]
+    const aulasPorDia = await Promise.all(
+        dateSet.map(async (iso) => {
+            const result = await fetchAulasWithPresence(alunoId, iso)
+            return [iso, result.aulas] as const
+        })
+    )
+
+    const aulasMap = Object.fromEntries(aulasPorDia)
+    const selectedAulas = aulasMap[requestedDate] ?? []
+    const proximaAula = await getProximaAula(alunoId)
+
+    const dias = daysToFetch.map((dia) => ({
+        iso: dia.iso,
+        label: dia.label,
+        shortLabel: dia.shortLabel,
+        dayNumber: dia.dayNumber,
+        isToday: dia.isToday,
+        hasClasses: (aulasMap[dia.iso] ?? []).length > 0,
+    }))
 
     return {
-        hoje: hoje.aulas,
-        amanha: amanha.aulas,
+        selectedDateISO: requestedDate,
+        selectedLabel: toBRDate(requestedDate),
+        dias,
+        aulas: selectedAulas,
         proximaAula,
     }
 }
@@ -650,18 +1010,19 @@ export async function addFeedComment(postId: string, alunoId: string, texto: str
         texto: texto.trim(),
     })
 
-    // Notificar sobre novo comentário
+    // Notificar gestão sobre novo comentário
     const { data: post } = await supabase.from('posts').select('conteudo').eq('id', postId).single()
 
     if (post && aluno) {
-        await supabase.from('notificacoes').insert({
-            titulo: 'Novo comentário no Feed',
-            subtitulo: `${aluno.nome} comentou em um post`,
-            mensagem: `${aluno.nome}: "${texto.substring(0, 40)}..."`,
+        await insertNotification({
+            titulo: 'Novo comentario no feed',
+            subtitulo: `${aluno.nome} comentou em uma postagem`,
+            mensagem: `${aluno.nome}: "${texto.substring(0, 40)}${texto.length > 40 ? '...' : ''}"`,
             tipo: 'ct',
-            lida: false,
             acao: 'comment',
-            link: '/feed'
+            link: '/feed',
+            audiencia: 'gestao',
+            icone: 'message-square',
         })
     }
 }
@@ -676,19 +1037,20 @@ export async function toggleFeedLike(postId: string, alunoId: string, currentlyL
     } else {
         await supabase.from('post_curtidas').insert({ post_id: postId, aluno_id: alunoId })
 
-        // Notifica o autor do post e o adm
+        // Notifica a gestão sobre novo engajamento
         const { data: post } = await supabase.from('posts').select('conteudo').eq('id', postId).single()
         const { data: aluno } = await supabase.from('alunos').select('nome').eq('id', alunoId).single()
 
         if (post && aluno) {
-            await supabase.from('notificacoes').insert({
-                titulo: 'Nova curtida no Feed',
-                subtitulo: `${aluno.nome} curtiu seu post`,
-                mensagem: `${aluno.nome} curtiu: "${post.conteudo?.substring(0, 40)}..."`,
+            await insertNotification({
+                titulo: 'Nova curtida no feed',
+                subtitulo: `${aluno.nome} curtiu uma postagem`,
+                mensagem: `${aluno.nome} curtiu: "${post.conteudo?.substring(0, 40)}${String(post.conteudo ?? '').length > 40 ? '...' : ''}"`,
                 tipo: 'ct',
-                lida: false,
                 acao: 'like',
-                link: '/feed'
+                link: '/feed',
+                audiencia: 'gestao',
+                icone: 'heart',
             })
         }
     }
@@ -894,15 +1256,28 @@ export async function fetchNotificacoes(alunoId: string): Promise<HomeNotificati
     if (isMissingTable(res.error)) return []
 
     const rows = (res.data as Record<string, unknown>[]) ?? []
-    return rows.map((row) => ({
+    return rows
+        .filter((row) => {
+            const audience = String(row.audiencia ?? 'aluno').toLowerCase()
+            return audience !== 'gestao' && audience !== 'professor'
+        })
+        .map((row) => ({
         id: String(row.id),
         tipo: String(row.tipo ?? 'ct'),
         titulo: String(row.titulo ?? 'Notificacao'),
         subtitulo: String(row.subtitulo ?? row.mensagem ?? ''),
+        mensagem: (row.mensagem as string) ?? null,
         horario: toRelativeTime(row.created_at as string),
         lida: Boolean(row.lida),
         acao: (row.acao as string) ?? null,
         link: (row.link as string) ?? null,
+        actionLabel: mapNotificationActionLabel(
+            String(row.tipo ?? 'ct'),
+            (row.acao as string) ?? null
+        ),
+        created_at: (row.created_at as string) ?? null,
+        icone: (row.icone as string) ?? null,
+        audiencia: (row.audiencia as string) ?? 'aluno',
     }))
 }
 
@@ -962,6 +1337,8 @@ export async function fetchEventos(alunoId: string): Promise<EventoApp[]> {
             data_evento: String(row.data_evento),
             local: (row.local as string) ?? 'CT Argel Riboli',
             icone: (row.icone as string) ?? '🥊',
+            imagem_url: (row.imagem_url as string) ?? null,
+            valor: row.valor != null ? Number(row.valor) : null,
             destaque: Boolean(row.destaque),
             ativo: Boolean(row.ativo),
             confirmados: countByEvento[id] ?? Number(row.confirmados ?? 0) ?? 0,
@@ -980,6 +1357,24 @@ export async function setConfirmacaoEvento(alunoId: string, eventoId: string, co
             },
             { onConflict: 'evento_id,aluno_id' }
         )
+
+        const [{ data: aluno }, { data: evento }] = await Promise.all([
+            supabase.from('alunos').select('nome').eq('id', alunoId).maybeSingle(),
+            supabase.from('eventos').select('titulo').eq('id', eventoId).maybeSingle(),
+        ])
+
+        if (aluno?.nome && evento?.titulo) {
+            await insertNotification({
+                titulo: 'Confirmacao de evento',
+                subtitulo: `${aluno.nome} confirmou presenca em um evento`,
+                mensagem: `${aluno.nome} confirmou: ${evento.titulo}`,
+                tipo: 'evento',
+                acao: 'evento',
+                link: '/eventos',
+                audiencia: 'gestao',
+                icone: 'party-popper',
+            })
+        }
     } else {
         await supabase
             .from('evento_confirmacoes')

@@ -1,311 +1,630 @@
 import { Feather } from '@expo/vector-icons'
-import { useCallback, useEffect, useState } from 'react'
-import { Alert, FlatList, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native'
 
-import { AulaSkeleton } from '@/components/SkeletonLoader'
+import BottomSheetModal from '@/components/BottomSheetModal'
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchCheckinData, type CheckinData, setPresencaStatus } from '@/lib/appData'
+import { fetchAgendaData, setPresencaStatus, type AgendaData } from '@/lib/appData'
 
-function emptyCheckinData(): CheckinData {
+function buildEmptyAgendaData(): AgendaData {
     return {
-        hoje: [],
-        amanha: [],
+        selectedDateISO: '',
+        selectedLabel: '',
+        dias: [],
+        aulas: [],
         proximaAula: null,
     }
 }
 
-// Função para gerar os próximos 7 dias
-function getNext7Days() {
-    const days = []
-    const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
+function buildMonthDays(baseDateISO: string) {
+    const baseDate = baseDateISO ? new Date(`${baseDateISO}T12:00:00`) : new Date()
+    const year = baseDate.getFullYear()
+    const month = baseDate.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const startWeekDay = firstDay.getDay()
+    const totalDays = lastDay.getDate()
+    const cells: Array<{ iso: string; day: number; empty: boolean }> = []
 
-    for (let i = 0; i < 7; i++) {
-        const date = new Date()
-        date.setDate(date.getDate() + i)
-        days.push({
-            day: date.getDate(),
-            weekDay: weekDays[date.getDay()],
-            isToday: i === 0,
-            date: date,
-        })
+    for (let index = 0; index < startWeekDay; index += 1) {
+        cells.push({ iso: `empty-${index}`, day: 0, empty: true })
     }
 
-    return days
+    for (let day = 1; day <= totalDays; day += 1) {
+        const date = new Date(year, month, day)
+        const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        cells.push({ iso, day, empty: false })
+    }
+
+    return {
+        monthLabel: baseDate.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase(),
+        yearLabel: String(year),
+        cells,
+    }
 }
 
 export default function CheckinScreen() {
     const { aluno } = useAuth()
-    const [selectedDayIndex, setSelectedDayIndex] = useState(0)
-    const [loadingAction, setLoadingAction] = useState(false)
-    const [loadingData, setLoadingData] = useState(true)
+    const [agendaData, setAgendaData] = useState<AgendaData>(buildEmptyAgendaData)
+    const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
-    const [data, setData] = useState<CheckinData>(emptyCheckinData)
-    const days = getNext7Days()
+    const [savingId, setSavingId] = useState<string | null>(null)
+    const [calendarVisible, setCalendarVisible] = useState(false)
 
-    const loadData = useCallback(async () => {
+    const loadAgenda = useCallback(async (selectedDateISO?: string, isRefresh = false) => {
         if (!aluno?.id) {
-            setLoadingData(false)
+            setLoading(false)
+            setRefreshing(false)
+            setAgendaData(buildEmptyAgendaData())
             return
         }
+
+        if (isRefresh) setRefreshing(true)
+        else setLoading(true)
+
         try {
-            const next = await fetchCheckinData(aluno.id)
-            setData(next)
+            const next = await fetchAgendaData(aluno.id, selectedDateISO ?? agendaData.selectedDateISO)
+            setAgendaData(next)
         } catch (error) {
-            console.error('[Checkin] Erro ao carregar dados:', error)
+            console.error('[Agenda] Erro ao carregar agenda:', error)
         } finally {
-            setLoadingData(false)
+            setLoading(false)
+            setRefreshing(false)
         }
-    }, [aluno?.id])
+    }, [agendaData.selectedDateISO, aluno?.id])
 
     useEffect(() => {
-        loadData()
-    }, [loadData])
+        void loadAgenda()
+    }, [loadAgenda])
 
-    const onRefresh = useCallback(async () => {
-        setRefreshing(true)
-        await loadData()
-        setRefreshing(false)
-    }, [loadData])
+    const handleSelectDay = useCallback(async (iso: string) => {
+        await loadAgenda(iso)
+    }, [loadAgenda])
 
-    const handleConfirmarPresenca = useCallback(async (aulaId: string) => {
-        if (!aluno?.id || loadingAction) return
-        setLoadingAction(true)
-        try {
-            await setPresencaStatus(aluno.id, aulaId, 'agendado')
-            await loadData()
-            Alert.alert('Presença confirmada', 'Você está confirmado para esta aula!')
-        } catch (error) {
-            console.error('[Checkin] Erro ao confirmar presenca:', error)
-            Alert.alert('Erro', 'Não foi possível confirmar presença. Tente novamente.')
-        } finally {
-            setLoadingAction(false)
+    const handleRefresh = useCallback(async () => {
+        await loadAgenda(agendaData.selectedDateISO, true)
+    }, [agendaData.selectedDateISO, loadAgenda])
+
+    const handlePresence = useCallback(async (aulaId: string, alreadyBooked: boolean) => {
+        if (!aluno?.id || savingId) return
+        const aula = agendaData.aulas.find((item) => item.id === aulaId)
+        if (!aula) return
+
+        if (!alreadyBooked && !aula.presenceActionEnabled) {
+            Alert.alert('Confirmacao indisponivel', aula.presenceRestrictionMessage ?? 'Essa aula nao pode ser confirmada agora.')
+            return
         }
-    }, [aluno?.id, loadingAction, loadData])
 
-    const handleListaEspera = useCallback(async (aulaId: string) => {
-        if (!aluno?.id || loadingAction) return
-        setLoadingAction(true)
+        setSavingId(aulaId)
         try {
-            await setPresencaStatus(aluno.id, aulaId, 'agendado')
-            await loadData()
-            Alert.alert('Lista de espera', 'Você foi adicionado à lista de espera.')
+            await setPresencaStatus(aluno.id, aulaId, alreadyBooked ? 'cancelada' : 'agendado')
+            await loadAgenda(agendaData.selectedDateISO)
         } catch (error) {
-            console.error('[Checkin] Erro ao entrar na lista de espera:', error)
-            Alert.alert('Erro', 'Não foi possível atualizar sua inscrição. Tente novamente.')
+            console.error('[Agenda] Erro ao atualizar presenca:', error)
+            Alert.alert(
+                'Erro',
+                error instanceof Error ? error.message : 'Nao foi possivel atualizar sua presenca.'
+            )
         } finally {
-            setLoadingAction(false)
+            setSavingId(null)
         }
-    }, [aluno?.id, loadingAction, loadData])
+    }, [agendaData.aulas, agendaData.selectedDateISO, aluno?.id, loadAgenda, savingId])
 
-    const handleCancelar = useCallback((aulaId: string) => {
-        if (!aluno?.id || loadingAction) return
-        Alert.alert('Cancelar presença?', 'Tem certeza que deseja cancelar?', [
-            { text: 'Não', style: 'cancel' },
-            {
-                text: 'Sim, cancelar',
-                style: 'destructive',
-                onPress: async () => {
-                    setLoadingAction(true)
-                    try {
-                        await setPresencaStatus(aluno.id, aulaId, 'cancelada')
-                        await loadData()
-                        Alert.alert('Cancelado', 'Sua presença foi cancelada.')
-                    } catch (error) {
-                        console.error('Erro ao cancelar:', error)
-                        Alert.alert('Erro', 'Não foi possível cancelar.')
-                    } finally {
-                        setLoadingAction(false)
-                    }
-                },
-            },
-        ])
-    }, [aluno?.id, loadData, loadingAction])
-
-    // Determinar quais aulas mostrar baseado no dia selecionado
-    const listaAulas = selectedDayIndex === 0 ? data.hoje : selectedDayIndex === 1 ? data.amanha : []
-
-    const now = new Date()
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    const isToday = selectedDayIndex === 0
+    const calendarData = useMemo(
+        () => buildMonthDays(agendaData.selectedDateISO || new Date().toISOString().slice(0, 10)),
+        [agendaData.selectedDateISO]
+    )
 
     return (
-        <View className="flex-1 bg-[#FDFDFD]">
-            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 pt-12 shadow-sm shadow-slate-200/50">
-                <Text className="mb-1 text-sm font-bold uppercase tracking-widest text-slate-500">Passaporte</Text>
-                <Text className="mb-6 text-4xl font-black tracking-tight text-slate-900">Check-in</Text>
+        <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+            <View
+                style={{
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E2E8F0',
+                    backgroundColor: '#FFFFFF',
+                    paddingBottom: 24,
+                    paddingLeft: 24,
+                    paddingRight: 24,
+                    paddingTop: 54,
+                }}
+            >
+                <View
+                    style={{
+                        marginBottom: 18,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                    }}
+                >
+                    <View>
+                        <Text
+                            style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                letterSpacing: 1.8,
+                                color: '#94A3B8',
+                                textTransform: 'uppercase',
+                            }}
+                        >
+                            Aulas do CT
+                        </Text>
+                        <Text
+                            style={{
+                                marginTop: 8,
+                                fontSize: 36,
+                                fontWeight: '900',
+                                color: '#0F172A',
+                            }}
+                        >
+                            Agenda
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => setCalendarVisible(true)}
+                        style={{
+                            height: 50,
+                            width: 50,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 25,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            backgroundColor: '#F8FAFC',
+                        }}
+                    >
+                        <Feather name="calendar" size={20} color="#0F172A" />
+                    </TouchableOpacity>
+                </View>
 
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 12 }}
+                    contentContainerStyle={{ paddingRight: 12 }}
                 >
-                    {days.map((day, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            activeOpacity={0.7}
-                            onPress={() => setSelectedDayIndex(index)}
-                            className={`h-20 w-16 items-center justify-center rounded-2xl border ${
-                                selectedDayIndex === index
-                                    ? 'border-[#CC0000] bg-[#CC0000]'
-                                    : day.isToday
-                                    ? 'border-[#CC0000]/30 bg-red-50/50'
-                                    : 'border-slate-200 bg-white'
-                            }`}
-                        >
-                            <Text
-                                className={`mb-1 text-[10px] font-black uppercase tracking-widest ${
-                                    selectedDayIndex === index
-                                        ? 'text-white'
-                                        : day.isToday
-                                        ? 'text-[#CC0000]'
-                                        : 'text-slate-400'
-                                }`}
+                    {agendaData.dias.map((dia) => {
+                        const active = dia.iso === agendaData.selectedDateISO
+                        return (
+                            <TouchableOpacity
+                                key={dia.iso}
+                                activeOpacity={0.85}
+                                onPress={() => handleSelectDay(dia.iso)}
+                                style={{
+                                    marginRight: 12,
+                                    width: 80,
+                                    borderRadius: 22,
+                                    borderWidth: 1,
+                                    borderColor: active ? '#DC2626' : '#CBD5E1',
+                                    backgroundColor: active ? '#DC2626' : '#FFFFFF',
+                                    paddingVertical: 14,
+                                    paddingHorizontal: 12,
+                                    shadowColor: active ? '#DC2626' : '#000000',
+                                    shadowOffset: { width: 0, height: 8 },
+                                    shadowOpacity: active ? 0.18 : 0,
+                                    shadowRadius: 18,
+                                    elevation: active ? 5 : 0,
+                                }}
                             >
-                                {day.weekDay}
-                            </Text>
-                            <Text
-                                className={`text-2xl font-black ${
-                                    selectedDayIndex === index
-                                        ? 'text-white'
-                                        : day.isToday
-                                        ? 'text-[#CC0000]'
-                                        : 'text-slate-900'
-                                }`}
-                            >
-                                {day.day}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                                <Text
+                                    style={{
+                                        fontSize: 11,
+                                        fontWeight: '800',
+                                        letterSpacing: 1.2,
+                                        color: active ? '#FEE2E2' : '#94A3B8',
+                                        textAlign: 'center',
+                                        textTransform: 'uppercase',
+                                    }}
+                                >
+                                    {dia.shortLabel}
+                                </Text>
+                                <Text
+                                    style={{
+                                        marginTop: 6,
+                                        fontSize: 28,
+                                        fontWeight: '900',
+                                        color: active ? '#FFFFFF' : '#94A3B8',
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    {dia.dayNumber}
+                                </Text>
+                                {dia.hasClasses && !active ? (
+                                    <View
+                                        style={{
+                                            alignSelf: 'center',
+                                            marginTop: 6,
+                                            height: 6,
+                                            width: 6,
+                                            borderRadius: 999,
+                                            backgroundColor: '#DC2626',
+                                        }}
+                                    />
+                                ) : (
+                                    <View style={{ marginTop: 12, height: 6 }} />
+                                )}
+                            </TouchableOpacity>
+                        )
+                    })}
                 </ScrollView>
             </View>
 
-            <FlatList
-                data={loadingData ? [] : listaAulas}
-                keyExtractor={(item) => item.id}
+            <ScrollView
+                contentContainerStyle={{ padding: 24, paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 120 }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                ListEmptyComponent={
-                    loadingData ? (
-                        <View>
-                            <AulaSkeleton />
-                            <AulaSkeleton />
-                        </View>
+            >
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleRefresh}
+                    style={{
+                        marginBottom: 20,
+                        alignSelf: 'flex-end',
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        backgroundColor: '#FFFFFF',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                    }}
+                >
+                    {refreshing ? (
+                        <ActivityIndicator color="#DC2626" />
                     ) : (
-                        <View className="items-center rounded-3xl border border-slate-100 bg-white p-8">
-                            <Feather name="calendar" size={40} color="#CBD5E1" />
-                            <Text className="mt-4 text-center text-sm text-slate-500">
-                                Nenhuma aula disponível para este dia.
-                            </Text>
-                        </View>
-                    )
-                }
-                renderItem={({ item: aula }) => {
-                    const isConfirmado = Boolean(aula.agendado || aula.presente)
-                    const isFull = aula.vagas_ocupadas >= aula.vagas_total && !isConfirmado
-                    const vagasRestantes = aula.vagas_total - aula.vagas_ocupadas
-                    const percentOcupado = (aula.vagas_ocupadas / aula.vagas_total) * 100
+                        <Text
+                            style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                letterSpacing: 1.1,
+                                color: '#0F172A',
+                                textTransform: 'uppercase',
+                            }}
+                        >
+                            Atualizar
+                        </Text>
+                    )}
+                </TouchableOpacity>
 
-                    const classMinutes = Number(aula.horario.split(':')[0]) * 60 + Number(aula.horario.split(':')[1])
-                    const isPassed = isToday && classMinutes < currentMinutes
+                <Text style={{ marginBottom: 18, fontSize: 14, fontWeight: '700', color: '#64748B' }}>
+                    {agendaData.selectedLabel || 'Carregando agenda...'}
+                </Text>
 
-                    return (
-                        <View className="mb-4 overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-sm shadow-slate-200/40">
-                            <View className="p-6">
-                                <View className="mb-4 flex-row items-start justify-between">
+                {loading ? (
+                    <View
+                        style={{
+                            borderRadius: 28,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            backgroundColor: '#FFFFFF',
+                            paddingVertical: 44,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <ActivityIndicator color="#DC2626" />
+                    </View>
+                ) : agendaData.aulas.length === 0 ? (
+                    <View
+                        style={{
+                            borderRadius: 28,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            backgroundColor: '#FFFFFF',
+                            paddingVertical: 44,
+                            paddingHorizontal: 24,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Feather name="calendar" size={34} color="#CBD5E1" />
+                        <Text
+                            style={{
+                                marginTop: 18,
+                                fontSize: 18,
+                                fontWeight: '800',
+                                color: '#0F172A',
+                            }}
+                        >
+                            Nenhuma aula nessa data
+                        </Text>
+                        <Text
+                            style={{
+                                marginTop: 8,
+                                textAlign: 'center',
+                                fontSize: 14,
+                                lineHeight: 20,
+                                color: '#64748B',
+                            }}
+                        >
+                            Selecione outro dia na faixa acima ou use o calendario para escolher outra data.
+                        </Text>
+                    </View>
+                ) : (
+                    agendaData.aulas.map((aula) => {
+                        const isBooked = Boolean(aula.agendado || aula.presente)
+                        const isFull = aula.confirmationState === 'full'
+                        const actionDisabled = savingId === aula.id
+
+                        return (
+                            <View
+                                key={aula.id}
+                                style={{
+                                    marginBottom: 16,
+                                    borderRadius: 30,
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0',
+                                    backgroundColor: '#FFFFFF',
+                                    padding: 22,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        marginBottom: 18,
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'flex-start',
+                                    }}
+                                >
                                     <View>
-                                        <Text className="mb-1 text-4xl font-black tracking-tight text-slate-900">
+                                        <Text style={{ fontSize: 34, fontWeight: '900', color: '#0F172A' }}>
                                             {aula.horario}
                                         </Text>
-                                        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                                            60 MIN
+                                        <Text
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: 12,
+                                                fontWeight: '800',
+                                                letterSpacing: 1.4,
+                                                color: '#94A3B8',
+                                                textTransform: 'uppercase',
+                                            }}
+                                        >
+                                            60 min
                                         </Text>
                                     </View>
-
-                                    {isPassed && (
-                                        <View className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                            <Text className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                                ESGOTADO
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-
-                                <Text className="mb-1 text-xl font-black tracking-tight text-slate-900">
-                                    {aula.nome}
-                                </Text>
-                                <View className="mb-5 flex-row items-center">
-                                    <Feather name="user" size={14} color="#94A3B8" />
-                                    <Text className="ml-1.5 text-sm font-semibold text-slate-500">
-                                        {aula.professor}
-                                    </Text>
-                                </View>
-
-                                {!isPassed && (
-                                    <View className="mb-5">
-                                        <View className="mb-2 flex-row items-center justify-between">
-                                            <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                                                {isFull ? 'SEM VAGAS' : `${vagasRestantes} VAGAS RESTANTES`}
-                                            </Text>
-                                            <Text className="text-xs font-bold text-slate-500">
-                                                {aula.vagas_ocupadas}/{aula.vagas_total}
-                                            </Text>
-                                        </View>
-                                        <View className="h-2 overflow-hidden rounded-full bg-slate-100">
-                                            <View
-                                                className={`h-full rounded-full ${
-                                                    isFull ? 'bg-slate-400' : 'bg-emerald-500'
-                                                }`}
-                                                style={{ width: `${Math.min(percentOcupado, 100)}%` }}
-                                            />
-                                        </View>
-                                    </View>
-                                )}
-
-                                {!isPassed && (
-                                    <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        onPress={() =>
-                                            isConfirmado
-                                                ? handleCancelar(aula.id)
+                                    <View
+                                        style={{
+                                            borderRadius: 14,
+                                            backgroundColor: isBooked
+                                                ? '#DCFCE7'
                                                 : isFull
-                                                ? handleListaEspera(aula.id)
-                                                : handleConfirmarPresenca(aula.id)
-                                        }
-                                        disabled={loadingAction}
-                                        className={`h-14 items-center justify-center rounded-2xl shadow-sm ${
-                                            isConfirmado
-                                                ? 'border border-slate-200 bg-slate-100'
-                                                : isFull
-                                                ? 'border border-amber-200 bg-amber-50'
-                                                : 'bg-[#CC0000] shadow-red-900/20'
-                                        }`}
-                                        style={{ opacity: loadingAction ? 0.6 : 1 }}
+                                                    ? '#F1F5F9'
+                                                    : '#FEE2E2',
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 8,
+                                        }}
                                     >
                                         <Text
-                                            className={`text-sm font-black uppercase tracking-widest ${
-                                                isConfirmado
-                                                    ? 'text-slate-600'
-                                                    : isFull
-                                                    ? 'text-amber-700'
-                                                    : 'text-white'
-                                            }`}
+                                            style={{
+                                                fontSize: 10,
+                                                fontWeight: '900',
+                                                letterSpacing: 1.2,
+                                                color: isBooked ? '#166534' : isFull ? '#64748B' : aula.presenceStatusLabel === 'Indisponivel' ? '#475569' : '#DC2626',
+                                                textTransform: 'uppercase',
+                                            }}
                                         >
-                                            {loadingAction
-                                                ? 'PROCESSANDO...'
-                                                : isConfirmado
-                                                ? 'CANCELAR PRESENÇA'
-                                                : isFull
-                                                ? 'LISTA DE ESPERA'
-                                                : 'CONFIRMAR PRESENÇA'}
+                                            {aula.presenceStatusLabel ?? (isBooked ? 'Confirmada' : isFull ? 'Lotada' : 'Disponivel')}
                                         </Text>
-                                    </TouchableOpacity>
-                                )}
+                                    </View>
+                                </View>
+
+                                <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A' }}>
+                                    {aula.nome}
+                                </Text>
+                                <Text style={{ marginTop: 6, fontSize: 15, fontWeight: '600', color: '#64748B' }}>
+                                    {aula.professor}
+                                </Text>
+
+                                <View style={{ marginTop: 18 }}>
+                                    <View
+                                        style={{
+                                            marginBottom: 8,
+                                            flexDirection: 'row',
+                                            justifyContent: 'space-between',
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#94A3B8' }}>
+                                            {aula.vagas_ocupadas}/{aula.vagas_total} alunos
+                                        </Text>
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#94A3B8' }}>
+                                            {Math.max(aula.vagas_total - aula.vagas_ocupadas, 0)} vagas
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={{
+                                            height: 10,
+                                            borderRadius: 999,
+                                            backgroundColor: '#E2E8F0',
+                                            overflow: 'hidden',
+                                        }}
+                                    >
+                                        <View
+                                            style={{
+                                                width: `${Math.min(
+                                                    (aula.vagas_total > 0
+                                                        ? (aula.vagas_ocupadas / aula.vagas_total) * 100
+                                                        : 0),
+                                                    100
+                                                )}%`,
+                                                height: '100%',
+                                                borderRadius: 999,
+                                                backgroundColor: isFull ? '#94A3B8' : '#10B981',
+                                            }}
+                                        />
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    disabled={actionDisabled}
+                                    onPress={() => handlePresence(aula.id, isBooked)}
+                                    style={{
+                                        marginTop: 20,
+                                        borderRadius: 18,
+                                        backgroundColor: isBooked
+                                            ? '#F1F5F9'
+                                            : aula.presenceActionEnabled
+                                                ? '#DC2626'
+                                                : '#E2E8F0',
+                                        opacity: actionDisabled ? 0.7 : 1,
+                                        paddingVertical: 16,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    {actionDisabled ? (
+                                        <ActivityIndicator color={isBooked ? '#334155' : '#FFFFFF'} />
+                                    ) : (
+                                        <Text
+                                            style={{
+                                                fontSize: 12,
+                                                fontWeight: '900',
+                                                letterSpacing: 1.4,
+                                                color: isBooked
+                                                    ? '#334155'
+                                                    : aula.presenceActionEnabled
+                                                        ? '#FFFFFF'
+                                                        : '#475569',
+                                                textTransform: 'uppercase',
+                                            }}
+                                        >
+                                            {aula.presenceActionLabel ?? (isBooked ? 'Cancelar presenca' : isFull ? 'Sem vagas' : 'Confirmar presenca')}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
                             </View>
-                        </View>
-                    )
-                }}
-            />
+                        )
+                    })
+                )}
+            </ScrollView>
+
+            <BottomSheetModal visible={calendarVisible} onClose={() => setCalendarVisible(false)}>
+                <View style={{ paddingHorizontal: 24 }}>
+                    <Text style={{ fontSize: 36, fontWeight: '900', color: '#0F172A' }}>
+                        {calendarData.monthLabel}
+                    </Text>
+                    <Text
+                        style={{
+                            marginTop: 6,
+                            fontSize: 18,
+                            fontWeight: '700',
+                            color: '#94A3B8',
+                        }}
+                    >
+                        {calendarData.yearLabel}
+                    </Text>
+
+                    <View
+                        style={{
+                            marginTop: 28,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                        }}
+                    >
+                        {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((label, index) => (
+                            <Text
+                                key={`${label}-${index}`}
+                                style={{
+                                    width: 40,
+                                    textAlign: 'center',
+                                    fontSize: 12,
+                                    fontWeight: '800',
+                                    color: '#94A3B8',
+                                }}
+                            >
+                                {label}
+                            </Text>
+                        ))}
+                    </View>
+
+                    <View
+                        style={{
+                            marginTop: 18,
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            gap: 10,
+                        }}
+                    >
+                        {calendarData.cells.map((cell) => {
+                            if (cell.empty) {
+                                return <View key={cell.iso} style={{ height: 42, width: 42 }} />
+                            }
+
+                            const active = cell.iso === agendaData.selectedDateISO
+                            const hasClasses = agendaData.dias.some((dia) => dia.iso === cell.iso && dia.hasClasses)
+
+                            return (
+                                <TouchableOpacity
+                                    key={cell.iso}
+                                    activeOpacity={0.85}
+                                    onPress={async () => {
+                                        setCalendarVisible(false)
+                                        await handleSelectDay(cell.iso)
+                                    }}
+                                    style={{
+                                        height: 42,
+                                        width: 42,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderRadius: 14,
+                                        backgroundColor: active ? '#0A0F1D' : '#FFFFFF',
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 18,
+                                            fontWeight: '800',
+                                            color: active ? '#FFFFFF' : '#0F172A',
+                                        }}
+                                    >
+                                        {cell.day}
+                                    </Text>
+                                    {hasClasses && !active ? (
+                                        <View
+                                            style={{
+                                                position: 'absolute',
+                                                bottom: 3,
+                                                height: 4,
+                                                width: 4,
+                                                borderRadius: 999,
+                                                backgroundColor: '#DC2626',
+                                            }}
+                                        />
+                                    ) : null}
+                                </TouchableOpacity>
+                            )
+                        })}
+                    </View>
+
+                    <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => setCalendarVisible(false)}
+                        style={{
+                            marginTop: 28,
+                            marginBottom: 8,
+                            borderRadius: 18,
+                            backgroundColor: '#F1F5F9',
+                            paddingVertical: 18,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                fontSize: 13,
+                                fontWeight: '900',
+                                letterSpacing: 1.4,
+                                color: '#475569',
+                                textTransform: 'uppercase',
+                            }}
+                        >
+                            Fechar
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </BottomSheetModal>
         </View>
     )
 }

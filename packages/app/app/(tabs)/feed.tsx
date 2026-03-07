@@ -1,10 +1,10 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { FlatList, Modal, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View, Image, Keyboard } from 'react-native'
 
 import { FeedPostSkeleton } from '@/components/SkeletonLoader'
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchFeedData, toggleFeedLike, addFeedComment, fetchEventos, setConfirmacaoEvento } from '@/lib/appData'
+import { fetchFeedData, toggleFeedLike, addFeedComment, fetchEventos, fetchSinglePost, setConfirmacaoEvento } from '@/lib/appData'
 import type { FeedPost, EventoApp } from '@/lib/types'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -137,6 +137,13 @@ export default function FeedScreen() {
     const [selectedPostForComments, setSelectedPostForComments] = useState<FeedPost | null>(null)
     const [commentText, setCommentText] = useState('')
     const [sendingComment, setSendingComment] = useState(false)
+    const mountedRef = useRef(true)
+
+    useEffect(() => {
+        return () => {
+            mountedRef.current = false
+        }
+    }, [])
 
     const loadData = useCallback(async () => {
         if (!aluno?.id) {
@@ -213,24 +220,80 @@ export default function FeedScreen() {
     const handleSendComment = useCallback(async () => {
         if (!aluno?.id || !selectedPostForComments || !commentText.trim() || sendingComment) return
 
+        const postId = selectedPostForComments.id
+        const optimisticId = `temp-${Date.now()}`
+        const texto = commentText.trim()
+        const autor = aluno.nome || 'Aluno do CT'
+        const iniciais = autor.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+        const optimisticComment = {
+            id: optimisticId,
+            autor,
+            iniciais,
+            texto,
+            data: 'Agora',
+        }
+
         setSendingComment(true)
+        setCommentText('')
+        Keyboard.dismiss()
+
+        setPosts((prev) =>
+            prev.map((post) =>
+                post.id === postId
+                    ? {
+                        ...post,
+                        comentarios: [optimisticComment, ...post.comentarios],
+                    }
+                    : post
+            )
+        )
+        setSelectedPostForComments((prev) =>
+            prev && prev.id === postId
+                ? {
+                    ...prev,
+                    comentarios: [optimisticComment, ...prev.comentarios],
+                }
+                : prev
+        )
+
         try {
-            await addFeedComment(selectedPostForComments.id, aluno.id, commentText)
-            setCommentText('')
-            Keyboard.dismiss()
-            // Reload feed data to get new comment
-            await loadData()
-            // Update selectedPostForComments with new data
-            const updatedPost = posts.find(p => p.id === selectedPostForComments.id)
+            await addFeedComment(postId, aluno.id, texto)
+            const updatedPost = await fetchSinglePost(aluno.id, postId)
+
+            if (!mountedRef.current) return
+
             if (updatedPost) {
-                setSelectedPostForComments(updatedPost)
+                setPosts((prev) => prev.map((post) => (post.id === postId ? updatedPost : post)))
+                setSelectedPostForComments((prev) => (prev && prev.id === postId ? updatedPost : prev))
             }
         } catch (error) {
             console.error('Error sending comment:', error)
+            if (!mountedRef.current) return
+
+            setPosts((prev) =>
+                prev.map((post) =>
+                    post.id === postId
+                        ? {
+                            ...post,
+                            comentarios: post.comentarios.filter((comment) => comment.id !== optimisticId),
+                        }
+                        : post
+                )
+            )
+            setSelectedPostForComments((prev) =>
+                prev && prev.id === postId
+                    ? {
+                        ...prev,
+                        comentarios: prev.comentarios.filter((comment) => comment.id !== optimisticId),
+                    }
+                    : prev
+            )
         } finally {
-            setSendingComment(false)
+            if (mountedRef.current) {
+                setSendingComment(false)
+            }
         }
-    }, [aluno?.id, selectedPostForComments, commentText, sendingComment, loadData, posts])
+    }, [aluno?.id, aluno?.nome, selectedPostForComments, commentText, sendingComment])
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
@@ -259,6 +322,7 @@ export default function FeedScreen() {
                                 >
                                     {eventos.map((evento) => {
                                         const config = EVENTO_CONFIG[evento.icone || 'social'] || EVENTO_CONFIG.social
+                                        const eventImage = evento.imagem_url || config.image
                                         const dataFormatada = format(parseISO(evento.data_evento), "EEE, dd/MM", { locale: ptBR })
 
                                         return (
@@ -270,7 +334,7 @@ export default function FeedScreen() {
                                                 style={{ width: 220, height: 140 }}
                                             >
                                                 <Image
-                                                    source={{ uri: config.image, cache: 'force-cache' }}
+                                                    source={{ uri: eventImage, cache: 'force-cache' }}
                                                     style={{ width: '100%', height: '100%' }}
                                                     resizeMode="cover"
                                                 />
@@ -358,7 +422,7 @@ export default function FeedScreen() {
                                 <View className="relative">
                                     <Image
                                         source={{
-                                            uri: (EVENTO_CONFIG[selectedEvent.icone || 'social'] || EVENTO_CONFIG.social).image.replace('w=400', 'w=800'),
+                                            uri: (selectedEvent.imagem_url || (EVENTO_CONFIG[selectedEvent.icone || 'social'] || EVENTO_CONFIG.social).image).replace('w=400', 'w=800'),
                                             cache: 'force-cache'
                                         }}
                                         style={{ width: '100%', height: 300 }}
@@ -426,6 +490,13 @@ export default function FeedScreen() {
                                         </Text>
                                     </View>
 
+                                    <View className="mb-8 flex-row items-center">
+                                        <Feather name="credit-card" size={20} color="#CC0000" />
+                                        <Text className="ml-3 text-base font-bold text-slate-900">
+                                            {selectedEvent.valor ? `R$ ${selectedEvent.valor.toFixed(2)}` : 'Evento gratuito'}
+                                        </Text>
+                                    </View>
+
                                     <TouchableOpacity
                                         activeOpacity={0.8}
                                         onPress={async () => {
@@ -486,7 +557,7 @@ export default function FeedScreen() {
                         <FlatList
                             data={selectedPostForComments?.comentarios || []}
                             showsVerticalScrollIndicator={false}
-                            keyExtractor={(item, index) => `comment-${index}`}
+                            keyExtractor={(item) => item.id}
                             style={{ minHeight: 200 }}
                             ListEmptyComponent={
                                 <View className="items-center justify-center py-16">

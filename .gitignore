@@ -12,6 +12,7 @@ build/
 .next/
 .turbo/
 .expo/
+packages/app/.expo-export-check*/
 
 # Environment variables
 .env

@@ -1,8 +1,26 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, useEffect } from 'react'
-import { Bell, CalendarClock, CreditCard, ShieldAlert, Megaphone, Trash2, CheckCheck, Check, ExternalLink, Settings2, Instagram, Youtube, Video, RefreshCw, Smartphone, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+    Bell,
+    CalendarClock,
+    Check,
+    CheckCheck,
+    CreditCard,
+    ExternalLink,
+    Heart,
+    Instagram,
+    Megaphone,
+    MessageSquare,
+    Search,
+    Settings2,
+    ShieldAlert,
+    Trash2,
+    UserCheck,
+    Users,
+    Youtube,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -11,17 +29,39 @@ import { useProfessoresSelect } from '@/hooks/useProfessores'
 import { createClient } from '@/lib/supabase/client'
 
 type Filtro = 'todas' | 'nao_lidas'
-type Tab = 'inbox' | 'alertas' | 'regras'
+type Tab = 'alunos' | 'gestao' | 'professores' | 'regras'
+type Audience = 'aluno' | 'gestao' | 'professor'
 
-const TIPO_META: Record<string, { label: string; icon: React.ElementType; tone: string }> = {
-    aula: { label: 'Aulas', icon: CalendarClock, tone: 'bg-orange-100 text-orange-700 border-orange-200' },
-    pagamento: { label: 'Financeiro', icon: CreditCard, tone: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-    ct: { label: 'CT', icon: Bell, tone: 'bg-red-100 text-red-700 border-red-200' },
-    sistema: { label: 'Sistema', icon: ShieldAlert, tone: 'bg-slate-100 text-slate-700 border-slate-200' },
+interface NotificationRule {
+    id: string
+    slug: string
+    audiencia: Audience
+    titulo: string
+    descricao: string
+    icone: string
+    enabled: boolean
 }
 
-function obterMeta(tipo: string) {
-    return TIPO_META[tipo] ?? { label: 'Geral', icon: Megaphone, tone: 'bg-gray-100 text-gray-700 border-gray-200' }
+const ICONS = {
+    bell: Bell,
+    'calendar-days': CalendarClock,
+    'calendar-plus': CalendarClock,
+    'credit-card': CreditCard,
+    'shield-alert': ShieldAlert,
+    'alert-triangle': ShieldAlert,
+    instagram: Instagram,
+    youtube: Youtube,
+    megaphone: Megaphone,
+    'user-check': UserCheck,
+    'message-square': MessageSquare,
+    heart: Heart,
+    'party-popper': Users,
+} as const
+
+const AUDIENCE_META: Record<Audience, { label: string; icon: React.ElementType; tone: string }> = {
+    aluno: { label: 'Alunos', icon: Bell, tone: 'bg-red-100 text-red-700 border-red-200' },
+    gestao: { label: 'Gestão', icon: ShieldAlert, tone: 'bg-slate-100 text-slate-700 border-slate-200' },
+    professor: { label: 'Professores', icon: UserCheck, tone: 'bg-blue-100 text-blue-700 border-blue-200' },
 }
 
 function formatarMomento(valor: string) {
@@ -38,54 +78,97 @@ function formatarMomento(valor: string) {
     return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function NotificacaoCard({ item, processando, onToggleLida, onRemover }: {
-    item: NotificacaoItem, processando: boolean, onToggleLida: (item: NotificacaoItem) => Promise<void>, onRemover: (id: string) => Promise<void>
+function NotificationCard({
+    item,
+    processando,
+    onToggleLida,
+    onRemover,
+}: {
+    item: NotificacaoItem
+    processando: boolean
+    onToggleLida: (item: NotificacaoItem) => Promise<void>
+    onRemover: (id: string) => Promise<void>
 }) {
-    const meta = obterMeta(item.tipo)
-    const Icon = meta.icon
-    return (
-        <article className={`rounded-2xl border p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 group ${item.lida ? 'border-gray-100 bg-white hover:border-gray-200' : 'border-[#CC0000]/20 bg-gradient-to-r from-red-50/80 to-orange-50/50 backdrop-blur-sm relative overflow-hidden'}`}>
-            {!item.lida && <div className="absolute top-0 left-0 w-1 h-full bg-[#CC0000] shadow-[0_0_10px_rgba(204,0,0,0.5)]" />}
+    const audience = (item.audiencia ?? 'aluno') as Audience
+    const meta = AUDIENCE_META[audience] ?? AUDIENCE_META.aluno
+    const AudienceIcon = meta.icon
+    const MainIcon = item.icone && item.icone in ICONS ? ICONS[item.icone as keyof typeof ICONS] : AudienceIcon
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between relative z-10">
+    return (
+        <article
+            className={`rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md ${
+                item.lida ? 'border-gray-100 bg-white' : 'border-[#CC0000]/20 bg-gradient-to-r from-red-50/70 to-white'
+            }`}
+        >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1">
-                    <div className="mb-3 flex flex-wrap items-center gap-2.5">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] sm:text-[11px] font-black uppercase tracking-widest ${meta.tone}`}>
-                            <Icon className="h-3.5 w-3.5" /> {meta.label}
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${meta.tone}`}>
+                            <AudienceIcon className="h-3.5 w-3.5" />
+                            {meta.label}
                         </span>
-                        {!item.lida && <span className="rounded-full bg-[#CC0000] px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white shadow-sm animate-pulse">Nova</span>}
-                        <span className="text-xs font-bold text-gray-400 flex items-center gap-1 flex-1 sm:flex-none justify-end sm:justify-start">
-                            <CalendarClock className="w-3 h-3" /> {formatarMomento(item.created_at)}
-                        </span>
+                        {!item.lida ? (
+                            <span className="rounded-full bg-[#CC0000] px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white">
+                                Nova
+                            </span>
+                        ) : null}
+                        <span className="text-xs font-bold text-gray-400">{formatarMomento(item.created_at)}</span>
                     </div>
 
-                    <h3 className={`text-base sm:text-lg font-black tracking-tight ${item.lida ? 'text-gray-900 group-hover:text-[#CC0000] transition-colors' : 'text-gray-900'}`}>{item.titulo}</h3>
-
-                    {item.subtitulo && <p className="mt-1 text-sm font-bold text-gray-500 uppercase tracking-widest">{item.subtitulo}</p>}
-                    {item.mensagem && <p className="mt-3 text-sm font-medium leading-relaxed text-gray-600 bg-gray-50/50 p-3 rounded-xl border border-gray-100">{item.mensagem}</p>}
-                    {item.aluno?.nome && <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-1 rounded-md"><Smartphone className="w-3 h-3" /> Aluno: {item.aluno.nome}</p>}
+                    <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-700">
+                            <MainIcon className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-base font-black tracking-tight text-gray-900">{item.titulo}</h3>
+                            {item.subtitulo ? (
+                                <p className="mt-1 text-xs font-black uppercase tracking-widest text-gray-400">{item.subtitulo}</p>
+                            ) : null}
+                            {item.mensagem ? (
+                                <p className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm font-medium leading-relaxed text-gray-600">
+                                    {item.mensagem}
+                                </p>
+                            ) : null}
+                            {item.aluno?.nome ? (
+                                <p className="mt-3 text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                                    Aluno: {item.aluno.nome}
+                                </p>
+                            ) : null}
+                            {item.professor_nome ? (
+                                <p className="mt-1 text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                                    Professor alvo: {item.professor_nome}
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex shrink-0 items-center justify-end sm:justify-start gap-2 pt-2 sm:pt-0 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100">
-                    {item.link && (
-                        <Link href={item.link} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-300">
-                            Abrir <ExternalLink className="h-3.5 w-3.5" />
+                <div className="flex items-center justify-end gap-2">
+                    {item.link ? (
+                        <Link
+                            href={item.link}
+                            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-gray-700 shadow-sm transition-all hover:bg-gray-50"
+                        >
+                            Abrir
+                            <ExternalLink className="h-3.5 w-3.5" />
                         </Link>
-                    )}
+                    ) : null}
                     <button
                         onClick={() => onToggleLida(item)}
                         disabled={processando}
-                        className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-4 text-xs font-black uppercase tracking-widest shadow-sm transition-all disabled:opacity-50 ${item.lida ? 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50' : 'border-gray-900 bg-gray-900 text-white hover:bg-black'}`}
+                        className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-4 text-xs font-black uppercase tracking-widest shadow-sm transition-all disabled:opacity-50 ${
+                            item.lida ? 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50' : 'border-gray-900 bg-gray-900 text-white hover:bg-black'
+                        }`}
                     >
-                        <Check className="h-4 w-4" /> {item.lida ? 'Marcar nova' : 'Dar Baixa'}
+                        <Check className="h-4 w-4" />
+                        {item.lida ? 'Marcar nova' : 'Dar baixa'}
                     </button>
                     <button
                         onClick={() => onRemover(item.id)}
                         disabled={processando}
-                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-red-100 bg-red-50 px-3 text-xs font-black uppercase tracking-widest text-red-600 shadow-sm transition-all hover:bg-red-100 hover:border-red-200 disabled:opacity-50 group/trash"
-                        title="Remover permanentemente"
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 text-red-600 transition-all hover:bg-red-100 disabled:opacity-50"
                     >
-                        <Trash2 className="h-4 w-4 group-hover/trash:scale-110 transition-transform" />
+                        <Trash2 className="h-4 w-4" />
                     </button>
                 </div>
             </div>
@@ -93,270 +176,447 @@ function NotificacaoCard({ item, processando, onToggleLida, onRemover }: {
     )
 }
 
-function ToggleRule({ label, description, icon: Icon, defaultChecked = false, tag = '' }: { label: string; description: string; icon: React.ElementType; defaultChecked?: boolean; tag?: string }) {
-    const [checked, setChecked] = useState(defaultChecked)
+function RuleCard({
+    rule,
+    onToggle,
+}: {
+    rule: NotificationRule
+    onToggle: (rule: NotificationRule) => Promise<void>
+}) {
+    const meta = AUDIENCE_META[rule.audiencia]
+    const Icon = rule.icone in ICONS ? ICONS[rule.icone as keyof typeof ICONS] : Bell
 
     return (
-        <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl hover:border-gray-200 transition-all shadow-sm group">
+        <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl transition-colors ${checked ? 'bg-red-50 text-[#CC0000]' : 'bg-gray-50 text-gray-400'}`}>
-                    <Icon className="w-5 h-5" />
+                <div className={`rounded-2xl border p-3 ${meta.tone}`}>
+                    <Icon className="h-5 w-5" />
                 </div>
                 <div>
-                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                        {label} {tag && <span className="text-[9px] uppercase font-black tracking-widest bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{tag}</span>}
-                    </h4>
-                    <p className="text-xs font-medium text-gray-500 mt-0.5">{description}</p>
+                    <p className="text-sm font-black text-gray-900">{rule.titulo}</p>
+                    <p className="mt-1 text-sm font-medium text-gray-500">{rule.descricao}</p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-gray-400">{meta.label}</p>
                 </div>
             </div>
 
             <button
-                onClick={() => { setChecked(!checked); toast.success(`Regra de ${label} ${!checked ? 'ativada' : 'desativada'} com sucesso.`); }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#CC0000] focus:ring-offset-2 ${checked ? 'bg-[#CC0000]' : 'bg-gray-200'}`}
+                onClick={() => onToggle(rule)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    rule.enabled ? 'bg-[#CC0000]' : 'bg-gray-200'
+                }`}
             >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+                <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        rule.enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                />
             </button>
         </div>
     )
 }
 
 export default function NotificacoesPage() {
-    const { professores } = useProfessoresSelect()
     const supabase = createClient()
+    const { professores } = useProfessoresSelect()
     const [userEmail, setUserEmail] = useState<string | null>(null)
-
-    useEffect(() => {
-        supabase.auth.getUser().then(({ data }) => {
-            setUserEmail(data.user?.email ?? null)
-        })
-    }, [supabase])
-
-    const profAtual = professores.find(p => p.email?.toLowerCase() === userEmail?.toLowerCase())
-        ?? professores.find(p => p.nome?.toLowerCase().includes('argel'))
-        ?? (professores.length > 0 ? professores[0] : null)
-
-    const { notificacoes, loading, error, naoLidas, marcarComoLida, marcarTodasComoLidas, removerNotificacao } = useNotificacoes(profAtual || undefined)
-    const [busca, setBusca] = useState('')
+    const [tab, setTab] = useState<Tab>('alunos')
     const [filtro, setFiltro] = useState<Filtro>('todas')
-    const [tab, setTab] = useState<Tab>('inbox')
+    const [busca, setBusca] = useState('')
     const [processandoId, setProcessandoId] = useState<string | null>(null)
-    const [processandoTudo, setProcessandoTudo] = useState(false)
-
     const [modalDisparo, setModalDisparo] = useState(false)
-    const [disparoTipo, setDisparoTipo] = useState<'geral' | 'aula' | 'instagram' | 'youtube'>('geral')
-    const [disparoURL, setDisparoURL] = useState('')
+    const [rules, setRules] = useState<NotificationRule[]>([])
+    const [loadingRules, setLoadingRules] = useState(true)
+
+    const [audienciaDisparo, setAudienciaDisparo] = useState<Audience>('aluno')
+    const [professorAlvo, setProfessorAlvo] = useState('')
+    const [tipoDisparo, setTipoDisparo] = useState<'geral' | 'aula' | 'instagram' | 'youtube' | 'pagamento' | 'evento'>('geral')
     const [disparoTitulo, setDisparoTitulo] = useState('')
     const [disparoMensagem, setDisparoMensagem] = useState('')
-    const [disparoRecorrente, setDisparoRecorrente] = useState(false)
+    const [disparoURL, setDisparoURL] = useState('')
     const [enviandoPush, setEnviandoPush] = useState(false)
 
-    const listaFiltrada = useMemo(() => {
-        const termo = busca.trim().toLowerCase()
-        return notificacoes.filter((item) => {
-            const ehBroadcast = item.tipo === 'ct'
-            if (tab === 'inbox' && !ehBroadcast) return false
-            if (tab === 'alertas' && ehBroadcast) return false
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? null))
+    }, [supabase])
 
+    useEffect(() => {
+        async function loadRules() {
+            setLoadingRules(true)
+            const { data, error } = await supabase.from('notification_rules').select('*').order('audiencia').order('titulo')
+            if (error) {
+                toast.error('Não foi possível carregar as regras de notificação.')
+                setRules([])
+            } else {
+                setRules((data as NotificationRule[]) ?? [])
+            }
+            setLoadingRules(false)
+        }
+
+        void loadRules()
+    }, [supabase])
+
+    const profAtual =
+        professores.find((p) => p.email?.toLowerCase() === userEmail?.toLowerCase()) ??
+        professores.find((p) => p.nome?.toLowerCase().includes('argel')) ??
+        (professores.length > 0 ? professores[0] : null)
+
+    const { notificacoes, loading, error, marcarComoLida, removerNotificacao, refetch } = useNotificacoes(profAtual || undefined)
+
+    const filteredNotifications = useMemo(() => {
+        const termo = busca.trim().toLowerCase()
+
+        return notificacoes.filter((item) => {
+            const audience = (item.audiencia ?? 'aluno') as Audience
+            if (tab !== 'regras' && audience !== tab) return false
             if (filtro === 'nao_lidas' && item.lida) return false
+
             if (!termo) return true
 
-            const alvo = [item.titulo, item.subtitulo, item.mensagem, item.aluno?.nome].filter(Boolean).join(' ').toLowerCase()
-            return alvo.includes(termo)
-        })
-    }, [notificacoes, filtro, busca, tab])
+            const target = [item.titulo, item.subtitulo, item.mensagem, item.aluno?.nome, item.professor_nome]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
 
-    const countInboxLidas = notificacoes.filter(n => n.tipo === 'ct' && !n.lida).length
-    const countAlertasLidas = notificacoes.filter(n => n.tipo !== 'ct' && !n.lida).length
+            return target.includes(termo)
+        })
+    }, [busca, filtro, notificacoes, tab])
+
+    const tabCounts = useMemo(
+        () => ({
+            alunos: notificacoes.filter((item) => !item.lida && (item.audiencia ?? 'aluno') === 'aluno').length,
+            gestao: notificacoes.filter((item) => !item.lida && (item.audiencia ?? 'aluno') === 'gestao').length,
+            professores: notificacoes.filter((item) => !item.lida && (item.audiencia ?? 'aluno') === 'professor').length,
+        }),
+        [notificacoes]
+    )
 
     async function handleToggleLida(item: NotificacaoItem) {
         setProcessandoId(item.id)
         const ok = await marcarComoLida(item.id, !item.lida)
         setProcessandoId(null)
-        if (!ok) toast.error('Falha ao atualizar status.')
-    }
-
-    async function handleMarcarTodas() {
-        setProcessandoTudo(true)
-        const ids = listaFiltrada.filter(n => !n.lida).map(n => n.id)
-        if (ids.length === 0) { setProcessandoTudo(false); return }
-        const { error } = await supabase.from('notificacoes').update({ lida: true }).in('id', ids)
-        setProcessandoTudo(false)
-        if (error) toast.error('Erro de I/O.')
-        else {
-            toast.success('Itens atualizados.')
-            window.location.reload()
-        }
+        if (!ok) toast.error('Falha ao atualizar a notificação.')
     }
 
     async function handleRemover(id: string) {
         setProcessandoId(id)
         const ok = await removerNotificacao(id)
         setProcessandoId(null)
-        if (!ok) toast.error('Erro ao remover.')
+        if (!ok) toast.error('Falha ao remover a notificação.')
     }
 
-    async function handleDispararPush() {
-        if (!disparoTitulo) { toast.error('Título obrigatório.'); return }
-        setEnviandoPush(true)
+    async function handleMarcarTodas() {
+        const ids = filteredNotifications.filter((item) => !item.lida).map((item) => item.id)
+        if (ids.length === 0) return
 
-        const { error: insertError } = await supabase.from('notificacoes').insert({
-            titulo: disparoTitulo,
-            mensagem: disparoMensagem,
-            tipo: 'ct',
-            link: disparoURL || null,
-            lida: false,
-            subtitulo: disparoRecorrente ? 'DISPARO RECORRENTE' : 'DISPARO ÚNICO'
-        })
-
-        if (insertError) {
-            toast.error('Erro ao disparar: ' + insertError.message)
-            setEnviandoPush(false)
+        const { error: updateError } = await supabase.from('notificacoes').update({ lida: true }).in('id', ids)
+        if (updateError) {
+            toast.error('Falha ao dar baixa em lote.')
             return
         }
 
-        toast.success(`Broadcasting enviado para todos os alunos!`)
+        toast.success('Notificações atualizadas.')
+        await refetch()
+    }
+
+    async function handleToggleRule(rule: NotificationRule) {
+        const { error: updateError } = await supabase
+            .from('notification_rules')
+            .update({ enabled: !rule.enabled })
+            .eq('id', rule.id)
+
+        if (updateError) {
+            toast.error('Falha ao atualizar a regra.')
+            return
+        }
+
+        setRules((prev) => prev.map((item) => (item.id === rule.id ? { ...item, enabled: !item.enabled } : item)))
+        toast.success(`Regra ${!rule.enabled ? 'ativada' : 'desativada'}.`)
+    }
+
+    async function handleDispararPush() {
+        if (!disparoTitulo.trim()) {
+            toast.error('Informe um título para a notificação.')
+            return
+        }
+
+        setEnviandoPush(true)
+
+        const iconByType: Record<typeof tipoDisparo, string> = {
+            geral: 'bell',
+            aula: 'calendar-days',
+            instagram: 'instagram',
+            youtube: 'youtube',
+            pagamento: 'credit-card',
+            evento: 'party-popper',
+        }
+
+        const { error: insertError } = await supabase.from('notificacoes').insert({
+            titulo: disparoTitulo,
+            subtitulo: `Disparo manual · ${AUDIENCE_META[audienciaDisparo].label}`,
+            mensagem: disparoMensagem || null,
+            tipo: tipoDisparo === 'pagamento' ? 'pagamento' : tipoDisparo === 'evento' ? 'evento' : tipoDisparo === 'aula' ? 'aula' : tipoDisparo === 'youtube' ? 'video' : 'ct',
+            link: disparoURL || null,
+            lida: false,
+            audiencia: audienciaDisparo,
+            professor_nome: audienciaDisparo === 'professor' ? professorAlvo || null : null,
+            icone: iconByType[tipoDisparo],
+        })
+
         setEnviandoPush(false)
+
+        if (insertError) {
+            toast.error(`Erro ao disparar: ${insertError.message}`)
+            return
+        }
+
+        toast.success('Notificação criada com sucesso.')
         setModalDisparo(false)
+        setAudienciaDisparo('aluno')
+        setProfessorAlvo('')
+        setTipoDisparo('geral')
         setDisparoTitulo('')
         setDisparoMensagem('')
         setDisparoURL('')
-        setTimeout(() => window.location.reload(), 500)
+        await refetch()
     }
 
+    const groupedRules = useMemo(
+        () => ({
+            aluno: rules.filter((rule) => rule.audiencia === 'aluno'),
+            gestao: rules.filter((rule) => rule.audiencia === 'gestao'),
+            professor: rules.filter((rule) => rule.audiencia === 'professor'),
+        }),
+        [rules]
+    )
+
     return (
-        <div className="mx-auto max-w-[1440px] space-y-6 pb-8 animate-in slide-in-from-bottom-2 duration-500">
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-0 gap-4">
-                <div className="pb-4">
+        <div className="mx-auto max-w-[1440px] space-y-6 pb-8">
+            <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
                     <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight text-gray-900">
-                        <Smartphone className="h-6 w-6 text-[#CC0000]" /> Notificações & Push
+                        <Bell className="h-6 w-6 text-[#CC0000]" />
+                        Central de Notificações
                     </h2>
-                    <p className="mt-1 text-sm font-medium text-gray-500">Painel de disparos manuais e alertas de sistema.</p>
+                    <p className="mt-1 text-sm font-medium text-gray-500">
+                        Separe alertas por audiência e configure automações do app.
+                    </p>
                 </div>
 
-                <div className="flex gap-8 border-b-2 border-transparent">
-                    <button onClick={() => setTab('inbox')} className={`pb-4 text-xs font-black uppercase tracking-widest relative transition-all ${tab === 'inbox' ? 'text-[#CC0000]' : 'text-gray-400 hover:text-gray-700'}`}>
-                        Caixa de Entrada {countInboxLidas > 0 && <span className="ml-2 bg-red-100 text-[#CC0000] px-2 py-0.5 rounded-full text-[10px]">{countInboxLidas}</span>}
-                        {tab === 'inbox' && <div className="absolute bottom-[-2px] left-0 w-full h-[2px] bg-[#CC0000]" />}
-                    </button>
-                    <button onClick={() => setTab('alertas')} className={`pb-4 text-xs font-black uppercase tracking-widest relative transition-all ${tab === 'alertas' ? 'text-[#CC0000]' : 'text-gray-400 hover:text-gray-700'}`}>
-                        Alertas do Sistema {countAlertasLidas > 0 && <span className="ml-2 bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-[10px]">{countAlertasLidas}</span>}
-                        {tab === 'alertas' && <div className="absolute bottom-[-2px] left-0 w-full h-[2px] bg-[#CC0000]" />}
-                    </button>
-                    <button onClick={() => setTab('regras')} className={`pb-4 text-xs font-black uppercase tracking-widest relative transition-all ${tab === 'regras' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-700'}`}>
-                        Regras de Automação
-                        {tab === 'regras' && <div className="absolute bottom-[-2px] left-0 w-full h-[2px] bg-gray-900" />}
-                    </button>
+                <div className="flex flex-wrap gap-6">
+                    {(['alunos', 'gestao', 'professores', 'regras'] as Tab[]).map((item) => (
+                        <button
+                            key={item}
+                            onClick={() => setTab(item)}
+                            className={`relative pb-2 text-xs font-black uppercase tracking-widest ${
+                                tab === item ? 'text-[#CC0000]' : 'text-gray-400 hover:text-gray-700'
+                            }`}
+                        >
+                            {item === 'alunos' ? 'Alunos' : item === 'gestao' ? 'Gestão' : item === 'professores' ? 'Professores' : 'Regras'}
+                            {item === 'alunos' && tabCounts.alunos > 0 ? <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] text-[#CC0000]">{tabCounts.alunos}</span> : null}
+                            {item === 'gestao' && tabCounts.gestao > 0 ? <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700">{tabCounts.gestao}</span> : null}
+                            {item === 'professores' && tabCounts.professores > 0 ? <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] text-blue-700">{tabCounts.professores}</span> : null}
+                            {tab === item ? <div className="absolute bottom-0 left-0 h-[2px] w-full bg-[#CC0000]" /> : null}
+                        </button>
+                    ))}
                 </div>
             </div>
 
             {tab !== 'regras' ? (
                 <>
-                    <section className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex flex-1 items-center gap-2 relative">
-                            <Search className="absolute ml-3 h-4 w-4 text-gray-400" />
+                    <section className="flex flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                             <input
-                                value={busca} onChange={(event) => setBusca(event.target.value)}
-                                placeholder={tab === 'inbox' ? "Pesquisar disparos feitos..." : "Pesquisar alertas recebidos..."}
-                                className="h-11 w-full rounded-2xl border border-gray-100 bg-gray-50 pl-10 pr-4 text-sm font-medium text-gray-800 outline-none focus:bg-white focus:border-[#CC0000] transition-all"
+                                value={busca}
+                                onChange={(event) => setBusca(event.target.value)}
+                                placeholder="Pesquisar notificações..."
+                                className="h-11 w-full rounded-2xl border border-gray-100 bg-gray-50 pl-10 pr-4 text-sm font-medium text-gray-800 outline-none transition-all focus:border-[#CC0000] focus:bg-white"
                             />
                         </div>
-                        <div className="flex items-center gap-2">
-                            {tab === 'inbox' && (
-                                <button onClick={() => setModalDisparo(true)} className="flex-1 lg:flex-none h-11 bg-gray-900 hover:bg-black text-white px-6 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2">
-                                    <Megaphone className="w-4 h-4" /> Novo Disparo
-                                </button>
-                            )}
-                            <button onClick={handleMarcarTodas} disabled={loading || processandoTudo} className="h-11 border border-gray-200 text-gray-500 px-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
-                                <CheckCheck className="w-4 h-4" /> Baixa em Bloco
+
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setFiltro((prev) => (prev === 'todas' ? 'nao_lidas' : 'todas'))}
+                                className="h-11 rounded-2xl border border-gray-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-gray-600 transition-colors hover:bg-gray-50"
+                            >
+                                {filtro === 'todas' ? 'Só não lidas' : 'Mostrar todas'}
+                            </button>
+                            <button
+                                onClick={handleMarcarTodas}
+                                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-gray-600 transition-colors hover:bg-gray-50"
+                            >
+                                <CheckCheck className="h-4 w-4" />
+                                Dar baixa em lote
+                            </button>
+                            <button
+                                onClick={() => setModalDisparo(true)}
+                                className="inline-flex h-11 items-center gap-2 rounded-2xl bg-gray-900 px-5 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-black"
+                            >
+                                <Megaphone className="h-4 w-4" />
+                                Novo disparo
                             </button>
                         </div>
                     </section>
 
-                    {loading ? <LoadingSpinner label="Sincronizando feed..." /> : error ? <div className="p-8 text-center bg-red-50 rounded-3xl border border-red-100 text-red-700 font-bold">{error}</div> : listaFiltrada.length === 0 ? (
+                    {loading ? (
+                        <LoadingSpinner label="Sincronizando notificações..." />
+                    ) : error ? (
+                        <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-sm font-semibold text-red-700">{error}</div>
+                    ) : filteredNotifications.length === 0 ? (
                         <EmptyState
-                            icon={tab === 'inbox' ? Megaphone : Bell}
-                            title={tab === 'inbox' ? "Sem disparos registrados" : "Nenhum alerta pendente"}
-                            description={tab === 'inbox' ? "Você ainda não criou notificações para os alunos." : "Tudo em ordem no CT!"}
-                            action={tab === 'inbox' ? { label: 'Novo Disparo', onClick: () => setModalDisparo(true) } : undefined}
+                            icon={Bell}
+                            title="Nenhuma notificação nessa faixa"
+                            description="A audiência selecionada ainda não tem itens nesse filtro."
+                            action={{ label: 'Novo disparo', onClick: () => setModalDisparo(true) }}
                         />
                     ) : (
                         <div className="grid grid-cols-1 gap-4">
-                            {listaFiltrada.map((item) => <NotificacaoCard key={item.id} item={item} processando={processandoId === item.id} onToggleLida={handleToggleLida} onRemover={handleRemover} />)}
+                            {filteredNotifications.map((item) => (
+                                <NotificationCard
+                                    key={item.id}
+                                    item={item}
+                                    processando={processandoId === item.id}
+                                    onToggleLida={handleToggleLida}
+                                    onRemover={handleRemover}
+                                />
+                            ))}
                         </div>
                     )}
                 </>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
-                    <div className="space-y-6">
-                        <div>
-                            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4 text-emerald-500" /> Financeiro</h4>
-                            <div className="space-y-3">
-                                <ToggleRule icon={CreditCard} label="Aviso de Fatura" description="Push 3 dias antes do vencimento" defaultChecked={true} tag="D-3" />
-                                <ToggleRule icon={ShieldAlert} label="Inadimplência" description="Alerta no dia seguinte ao atraso" defaultChecked={true} tag="D+1" />
-                            </div>
+                <div className="grid gap-6 xl:grid-cols-3">
+                    {loadingRules ? (
+                        <div className="xl:col-span-3">
+                            <LoadingSpinner label="Carregando regras..." />
                         </div>
-                    </div>
-                    <div className="space-y-6">
-                        <div className="bg-gray-900 p-8 rounded-3xl text-white">
-                            <Settings2 className="w-10 h-10 text-[#CC0000] mb-4" />
-                            <h4 className="text-xl font-black mb-2">Motor de Regras CT</h4>
-                            <p className="text-sm font-medium text-gray-400">As automações são geradas pela inteligência do KITAMO.</p>
-                        </div>
-                    </div>
+                    ) : (
+                        (['aluno', 'gestao', 'professor'] as Audience[]).map((audience) => (
+                            <section key={audience} className="space-y-4 rounded-3xl border border-gray-100 bg-gray-50/40 p-5">
+                                <div className="flex items-center gap-2">
+                                    {(() => {
+                                        const Icon = AUDIENCE_META[audience].icon
+                                        return <Icon className="h-5 w-5 text-[#CC0000]" />
+                                    })()}
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">{AUDIENCE_META[audience].label}</h3>
+                                </div>
+                                <div className="space-y-3">
+                                    {groupedRules[audience].map((rule) => (
+                                        <RuleCard key={rule.id} rule={rule} onToggle={handleToggleRule} />
+                                    ))}
+                                </div>
+                            </section>
+                        ))
+                    )}
                 </div>
             )}
 
-            {modalDisparo && (
+            {modalDisparo ? (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalDisparo(false)} />
-                    <div className="w-full max-w-lg bg-white rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-gray-100">
-                        <div className="flex items-center gap-4 mb-8">
-                            <div className="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-900">
-                                <Megaphone className="w-7 h-7" />
+                    <div className="relative z-10 w-full max-w-xl rounded-[2rem] border border-gray-100 bg-white p-8 shadow-2xl">
+                        <div className="mb-6 flex items-center gap-4">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
+                                <Megaphone className="h-7 w-7 text-gray-900" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black text-gray-900 tracking-tight">Novo Disparo Push</h3>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-[#CC0000]">Broadcast Imediato</p>
+                                <h3 className="text-xl font-black tracking-tight text-gray-900">Novo disparo</h3>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-[#CC0000]">Manual</p>
                             </div>
                         </div>
 
                         <div className="space-y-5">
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Assunto</label>
-                                <select value={disparoTipo} onChange={e => setDisparoTipo(e.target.value as any)} className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-4 font-bold text-sm outline-none focus:border-[#CC0000]">
-                                    <option value="geral">Aviso Geral</option>
-                                    <option value="aula">Treino / Aulas</option>
-                                    <option value="instagram">Instagram CT</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Título</label>
-                                <input type="text" value={disparoTitulo} onChange={e => setDisparoTitulo(e.target.value)} placeholder="Ex: Treino amanhã!" className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-4 font-bold text-sm outline-none focus:border-[#CC0000]" />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Mensagem</label>
-                                <textarea value={disparoMensagem} onChange={e => setDisparoMensagem(e.target.value)} placeholder="Detalhes..." rows={3} className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-medium text-sm outline-none focus:border-[#CC0000] resize-none" />
-                            </div>
-                            <div className="flex items-center justify-between p-4 bg-red-50/50 border border-red-100 rounded-2xl">
+                            <div className="grid gap-4 md:grid-cols-2">
                                 <div>
-                                    <p className="text-xs font-black text-[#CC0000] uppercase tracking-widest">Recorrente</p>
-                                    <p className="text-[10px] font-bold text-gray-500 mt-0.5">Repetir semanalmente</p>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Audiência</label>
+                                    <select
+                                        value={audienciaDisparo}
+                                        onChange={(event) => setAudienciaDisparo(event.target.value as Audience)}
+                                        className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-bold text-gray-800 outline-none focus:border-[#CC0000]"
+                                    >
+                                        <option value="aluno">Alunos</option>
+                                        <option value="gestao">Gestão</option>
+                                        <option value="professor">Professor</option>
+                                    </select>
                                 </div>
-                                <button onClick={() => setDisparoRecorrente(!disparoRecorrente)} className={`h-6 w-11 rounded-full p-1 transition-all ${disparoRecorrente ? 'bg-[#CC0000]' : 'bg-gray-200'}`}>
-                                    <div className={`h-full aspect-square bg-white rounded-full transition-transform ${disparoRecorrente ? 'translate-x-5' : 'translate-x-0'}`} />
-                                </button>
+                                <div>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Tipo</label>
+                                    <select
+                                        value={tipoDisparo}
+                                        onChange={(event) => setTipoDisparo(event.target.value as typeof tipoDisparo)}
+                                        className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-bold text-gray-800 outline-none focus:border-[#CC0000]"
+                                    >
+                                        <option value="geral">Geral</option>
+                                        <option value="aula">Aula</option>
+                                        <option value="pagamento">Pagamento</option>
+                                        <option value="evento">Evento</option>
+                                        <option value="instagram">Instagram</option>
+                                        <option value="youtube">YouTube</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {audienciaDisparo === 'professor' ? (
+                                <div>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Professor alvo</label>
+                                    <input
+                                        value={professorAlvo}
+                                        onChange={(event) => setProfessorAlvo(event.target.value)}
+                                        placeholder="Nome do professor"
+                                        className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-bold text-gray-800 outline-none focus:border-[#CC0000]"
+                                    />
+                                </div>
+                            ) : null}
+
+                            <div>
+                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Título</label>
+                                <input
+                                    value={disparoTitulo}
+                                    onChange={(event) => setDisparoTitulo(event.target.value)}
+                                    placeholder="Ex.: Novo evento liberado"
+                                    className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-bold text-gray-800 outline-none focus:border-[#CC0000]"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Mensagem</label>
+                                <textarea
+                                    value={disparoMensagem}
+                                    onChange={(event) => setDisparoMensagem(event.target.value)}
+                                    rows={4}
+                                    placeholder="Detalhes do alerta..."
+                                    className="w-full rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm font-medium text-gray-700 outline-none focus:border-[#CC0000]"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Link opcional</label>
+                                <input
+                                    value={disparoURL}
+                                    onChange={(event) => setDisparoURL(event.target.value)}
+                                    placeholder="/eventos ou https://..."
+                                    className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-medium text-gray-700 outline-none focus:border-[#CC0000]"
+                                />
                             </div>
                         </div>
 
                         <div className="mt-8 flex gap-3">
-                            <button onClick={() => setModalDisparo(false)} className="flex-1 h-12 text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 border border-gray-100 rounded-2xl">Cancelar</button>
-                            <button onClick={handleDispararPush} disabled={enviandoPush || !disparoTitulo} className="flex-[2] h-12 bg-gray-900 hover:bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl">
-                                {enviandoPush ? '...' : 'Disparar Agora'}
+                            <button
+                                onClick={() => setModalDisparo(false)}
+                                className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-xs font-black uppercase tracking-widest text-gray-500 transition-colors hover:bg-gray-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleDispararPush}
+                                disabled={enviandoPush || !disparoTitulo.trim() || (audienciaDisparo === 'professor' && !professorAlvo.trim())}
+                                className="flex-[1.5] rounded-2xl bg-gray-900 px-4 py-3 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-black disabled:opacity-50"
+                            >
+                                {enviandoPush ? 'Enviando...' : 'Criar notificação'}
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
+            ) : null}
         </div>
     )
 }

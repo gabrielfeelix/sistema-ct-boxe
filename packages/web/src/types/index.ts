@@ -136,7 +136,7 @@ export interface Comentario {
 }
 
 // ─── Story ─────────────────────────────────────────────────────────────────
-export interface Story {
+export interface StoryMediaItem {
     id: string
     autor_id: string
     autor_nome: string
@@ -151,7 +151,8 @@ export interface Story {
 }
 
 // ─── Notificação ───────────────────────────────────────────────────────────
-export type TipoNotificacao = 'aula' | 'pagamento' | 'ct' | 'sistema'
+export type TipoNotificacao = 'aula' | 'pagamento' | 'ct' | 'sistema' | 'video' | 'evento'
+export type AudienciaNotificacao = 'aluno' | 'gestao' | 'professor'
 
 export interface Notificacao {
     id: string
@@ -163,6 +164,9 @@ export interface Notificacao {
     aluno_id?: string
     acao?: string | null
     link?: string
+    audiencia?: AudienciaNotificacao | null
+    professor_nome?: string | null
+    icone?: string | null
     created_at: string
     updated_at?: string
 }
@@ -299,11 +303,9 @@ export interface Post {
 
 export interface Story {
     id: string
-    imagem_url?: string
-    legenda?: string
-    autor: string
-    expira_em: string
-    total_visualizacoes: number
+    nome: string
+    capa_url?: string | null
+    total_videos: number
     ativo: boolean
     created_at: string
 }

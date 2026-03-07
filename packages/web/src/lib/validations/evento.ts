@@ -29,6 +29,8 @@ export const eventoFormSchema = z.object({
         .min(3, 'O local precisa ter ao menos 3 caracteres.')
         .max(100, 'O local pode ter no maximo 100 caracteres.'),
     icone: z.enum(['churras', 'boxe', 'social', 'treino']),
+    valor: z.coerce.number().min(0, 'O valor nao pode ser negativo.').nullable().optional(),
+    imagem_url: z.string().trim().url('Imagem invalida.').nullable().optional().or(z.literal('')),
     destaque: z.boolean(),
 })
 

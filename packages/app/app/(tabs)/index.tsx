@@ -1,652 +1,870 @@
-import { Feather, FontAwesome5 } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { Feather } from '@expo/vector-icons'
+import { router, useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert,
-  Animated,
-  FlatList,
-  Linking,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  Image,
-  Platform,
-} from "react-native";
-import { useFocusEffect } from "expo-router";
+    ActivityIndicator,
+    Alert,
+    Image,
+    Linking,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native'
 
-import StoryViewer from "@/components/StoryViewer";
-import { useAuth } from "@/contexts/AuthContext";
+import BottomSheetModal from '@/components/BottomSheetModal'
+import NotificationIcon, { resolveNotificationIcon } from '@/components/NotificationIcon'
+import StoryViewer from '@/components/StoryViewer'
+import { useAuth } from '@/contexts/AuthContext'
 import {
-  fetchHomeData,
-  type HomeData,
-  type HomeAviso,
-  setPresencaStatus,
-} from "@/lib/appData";
-import { getInitials, toISODateLocal } from "@/lib/formatters";
-import type { AppAula } from "@/lib/types";
+    fetchAgendaData,
+    fetchHomeData,
+    fetchNotificacoes,
+    markAllNotificacoesLidas,
+    markNotificacaoLida,
+    setPresencaStatus,
+    type AgendaData,
+    type HomeData,
+} from '@/lib/appData'
+import { getInitials } from '@/lib/formatters'
+import type { HomeNotification, HomeStory } from '@/lib/types'
 
 function buildEmptyHomeData(): HomeData {
-  return {
-    stories: [],
-    notificacoesNaoLidas: 0,
-    avisos: [],
-    aulasHoje: [],
-    proximaAula: null,
-  };
+    return {
+        stories: [],
+        notificacoesNaoLidas: 0,
+        avisos: [],
+        proximasAulas: [],
+        proximaAula: null,
+    }
 }
 
-const AvisoItem = memo(
-  ({
-    aviso,
-    isExpanded,
-    onToggle,
-  }: {
-    key?: string | number;
-    aviso: HomeAviso;
-    isExpanded: boolean;
-    onToggle: (id: string) => void;
-  }) => (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={() => onToggle(aviso.id)}
-      className="mb-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
-    >
-      <View className="flex-row items-start justify-between">
-        <View className="mr-4 flex-1">
-          <View className="mb-2 flex-row items-center">
-            <View className="mr-2 h-1.5 w-1.5 rounded-full bg-[#CC0000]" />
-            <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              {aviso.data}
-            </Text>
-          </View>
-          <Text className="text-base font-bold tracking-tight text-slate-900">
-            {aviso.titulo}
-          </Text>
-          {isExpanded && (
-            <Text className="mt-3 text-sm leading-relaxed text-slate-500">
-              {aviso.texto}
-            </Text>
-          )}
-        </View>
-        <View className="mt-1 h-8 w-8 items-center justify-center rounded-full bg-slate-50">
-          <Feather
-            name={isExpanded ? "chevron-up" : "chevron-down"}
-            size={16}
-            color="#64748B"
-          />
-        </View>
-      </View>
-    </TouchableOpacity>
-  ),
-);
-
-const AulaHojeItem = memo(
-  ({
-    aula,
-    onPress,
-    onAgendarOuCancelar,
-    currentMinutes,
-  }: {
-    key?: string | number;
-    aula: AppAula;
-    onPress: (id: string) => void;
-    onAgendarOuCancelar: (id: string, isConfirmado: boolean) => void;
-    currentMinutes: number;
-  }) => {
-    const isLivre = aula.vagas_ocupadas < aula.vagas_total;
-    const isConfirmado = Boolean(aula.presente || aula.agendado);
-
-    // Verificar se a aula passou (considerar data + hora)
-    const today = toISODateLocal();
-    const classMinutes =
-      Number(aula.horario.split(":")[0]) * 60 +
-      Number(aula.horario.split(":")[1]);
-    const isPassed =
-      aula.data < today ||
-      (aula.data === today && classMinutes < currentMinutes);
-
-    return (
-      <View
-        className="mr-4 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50"
-        style={{ width: 280 }}
-      >
-        <TouchableOpacity activeOpacity={0.7} onPress={() => onPress(aula.id)}>
-          <View className="mb-4 flex-row items-start justify-between">
-            <Text className="text-2xl font-black tracking-tighter text-slate-900">
-              {aula.horario}
-            </Text>
-            <View
-              className={`rounded-md px-2 py-1 ${
-                isPassed
-                  ? "bg-slate-100"
-                  : isLivre
-                    ? "bg-emerald-50"
-                    : "bg-slate-100"
-              }`}
-            >
-              <Text
-                className={`text-[10px] font-black uppercase tracking-widest ${
-                  isPassed
-                    ? "text-slate-500"
-                    : isLivre
-                      ? "text-emerald-600"
-                      : "text-slate-500"
-                }`}
-              >
-                {isPassed ? "ENCERRADA" : isLivre ? "LIVRE" : "LOTADA"}
-              </Text>
-            </View>
-          </View>
-
-          <Text
-            className="mb-1 text-lg font-bold tracking-tight text-slate-900"
-            numberOfLines={1}
-          >
-            {aula.nome}
-          </Text>
-          <Text className="mb-6 text-sm font-medium text-slate-500">
-            {aula.professor}
-          </Text>
-        </TouchableOpacity>
-
-        <View className="mb-4 flex-row items-center justify-between border-t border-slate-100/50 pt-4">
-          <Text className="text-xs font-bold text-slate-400">
-            Confirmados: {aula.vagas_ocupadas}
-          </Text>
-          <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-            {aula.vagas_ocupadas}/{aula.vagas_total}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onAgendarOuCancelar(aula.id, isConfirmado)}
-          disabled={isPassed || (!isConfirmado && !isLivre)}
-          className={`h-10 flex-row items-center justify-center rounded-xl px-4 ${
-            isPassed
-              ? "bg-slate-50 border border-slate-100"
-              : isConfirmado
-                ? "bg-slate-100 border border-slate-200"
-                : !isLivre
-                  ? "bg-slate-100"
-                  : "border border-red-100 bg-red-50"
-          }`}
-        >
-          <Text
-            className={`text-[10px] font-black uppercase tracking-widest ${
-              isPassed
-                ? "text-slate-400"
-                : isConfirmado
-                  ? "text-slate-500"
-                  : !isLivre
-                    ? "text-slate-400"
-                    : "text-[#CC0000]"
-            }`}
-          >
-            {isPassed
-              ? "NAO DISPONIVEL"
-              : isConfirmado
-                ? "CANCELAR AGENDAMENTO"
-                : !isLivre
-                  ? "ESGOTADO"
-                  : "AGENDAR PRESENCA"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  },
-);
+function buildEmptyAgendaData(): AgendaData {
+    return {
+        selectedDateISO: '',
+        selectedLabel: '',
+        dias: [],
+        aulas: [],
+        proximaAula: null,
+    }
+}
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const { aluno } = useAuth();
-  const [homeData, setHomeData] = useState<HomeData>(buildEmptyHomeData);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [expandedAvisoId, setExpandedAvisoId] = useState<string | null>(null);
+    const appRouter = useRouter()
+    const { aluno } = useAuth()
+    const [homeData, setHomeData] = useState<HomeData>(buildEmptyHomeData)
+    const [loading, setLoading] = useState(true)
+    const [savingNextClass, setSavingNextClass] = useState(false)
+    const [storyVisible, setStoryVisible] = useState(false)
+    const [selectedStory, setSelectedStory] = useState<HomeStory | null>(null)
+    const [notificationsVisible, setNotificationsVisible] = useState(false)
+    const [notifications, setNotifications] = useState<HomeNotification[]>([])
+    const [notificationsLoading, setNotificationsLoading] = useState(false)
+    const [agendaVisible, setAgendaVisible] = useState(false)
+    const [agendaData, setAgendaData] = useState<AgendaData>(buildEmptyAgendaData)
+    const [agendaLoading, setAgendaLoading] = useState(false)
 
-  const [isStoryOpen, setIsStoryOpen] = useState(false);
-  const [initialStoryIndex, setInitialStoryIndex] = useState(0);
-  const heroScale = useRef(new Animated.Value(1)).current;
-  const shouldUseNativeDriver = Platform.OS !== "web";
-
-  const loadData = useCallback(async () => {
-    if (!aluno?.id) {
-      setHomeData(buildEmptyHomeData());
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const data = await fetchHomeData(aluno.id);
-      setHomeData(data);
-    } catch (error) {
-      console.error("[Home] Erro ao carregar dados:", error);
-      setHomeData(buildEmptyHomeData());
-    } finally {
-      setLoading(false);
-    }
-  }, [aluno?.id]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!aluno?.id) return;
-      loadData();
-    }, [aluno?.id, loadData]),
-  );
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
-
-  const handleNotificationClick = () => {
-    router.push("/notificacoes");
-  };
-
-  const handleConfirmar = useCallback(
-    async (aulaId: string) => {
-      if (!aluno?.id) return;
-
-      // Buscar o estado atual da aula
-      const aulaAtual =
-        homeData.aulasHoje.find((a) => a.id === aulaId) || homeData.proximaAula;
-      if (!aulaAtual || aulaAtual.id !== aulaId) return;
-
-      const isConfirmada =
-        Boolean(aulaAtual.presente) || Boolean(aulaAtual.agendado);
-
-      // Animação
-      Animated.sequence([
-        Animated.timing(heroScale, {
-          toValue: 0.95,
-          duration: 80,
-          useNativeDriver: shouldUseNativeDriver,
-        }),
-        Animated.timing(heroScale, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: shouldUseNativeDriver,
-        }),
-      ]).start();
-
-      try {
-        // Inverter status
-        if (isConfirmada) {
-          await setPresencaStatus(aluno.id, aulaId, "cancelada");
-          Alert.alert("Cancelado", "Sua presença foi cancelada.");
-        } else {
-          await setPresencaStatus(aluno.id, aulaId, "presente");
-          Alert.alert(
-            "Presença confirmada",
-            "Seu check-in foi registrado com sucesso.",
-          );
+    const loadHome = useCallback(async () => {
+        if (!aluno?.id) {
+            setHomeData(buildEmptyHomeData())
+            setLoading(false)
+            return
         }
-
-        // Recarregar dados
-        await loadData();
-      } catch (error) {
-        console.error("[Home] Erro ao confirmar/cancelar presenca:", error);
-        Alert.alert(
-          "Erro",
-          "Não foi possível atualizar sua presença. Tente novamente.",
-        );
-      }
-    },
-    [aluno?.id, homeData.aulasHoje, homeData.proximaAula, heroScale, loadData, shouldUseNativeDriver],
-  );
-
-  const handleAgendarOuCancelar = async (
-    aulaId: string,
-    isConfirmado: boolean,
-  ) => {
-    if (!aluno?.id) return;
-    try {
-      if (isConfirmado) {
-        await setPresencaStatus(aluno.id, aulaId, "cancelada");
-      } else {
-        await setPresencaStatus(aluno.id, aulaId, "agendado");
-      }
-      await loadData();
-    } catch (error) {
-      console.error("[Home] Erro ao agendar/cancelar aula:", error);
-      Alert.alert(
-        "Erro",
-        "Não foi possível atualizar o agendamento. Tente novamente.",
-      );
-    }
-  };
-
-  const toggleAviso = (id: string) => {
-    setExpandedAvisoId((prev) => (prev === id ? null : id));
-  };
-
-  const openStory = (index: number) => {
-    setInitialStoryIndex(index);
-    setIsStoryOpen(true);
-  };
-
-  const openLink = (url: string) => {
-    Linking.openURL(url).catch(() =>
-      Alert.alert("Ops", "Nao foi possivel abrir o link."),
-    );
-  };
-
-  const handleAulaPress = useCallback(
-    (id: string) => {
-      router.push(`/aula/${id}`);
-    },
-    [router],
-  );
-
-  const proximaAula = homeData.proximaAula;
-  const isAulaConfirmada =
-    Boolean(proximaAula?.presente) || Boolean(proximaAula?.agendado);
-
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const fallbackStories = [
-    {
-      id: "1",
-      nome: "Jab Basico",
-      thumbnail:
-        "https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400",
-      assistido: false,
-      duracao: 45,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      nome: "Esquiva Lateral",
-      thumbnail:
-        "https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400",
-      assistido: false,
-      duracao: 60,
-      created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: "3",
-      nome: "Combinacao 1-2",
-      thumbnail:
-        "https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400",
-      assistido: true,
-      duracao: 90,
-      created_at: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
-  const storiesData = homeData.stories.length > 0 ? homeData.stories : fallbackStories;
-
-  return (
-    <View className="flex-1 bg-[#FDFDFD]">
-      {isStoryOpen && (
-        <StoryViewer
-          stories={storiesData}
-          initialIndex={initialStoryIndex}
-          onClose={() => setIsStoryOpen(false)}
-        />
-      )}
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        setLoading(true)
+        try {
+            const data = await fetchHomeData(aluno.id)
+            setHomeData(data)
+        } catch (error) {
+            console.error('[Home] Erro ao carregar home:', error)
+            setHomeData(buildEmptyHomeData())
+        } finally {
+            setLoading(false)
         }
-      >
-        <View className="border-b border-slate-100 bg-white px-6 pb-4 pt-12">
-          <View className="mb-4 flex-row items-start justify-between">
-            <View className="flex-1">
-              <Text className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                BEM-VINDO DE VOLTA
-              </Text>
-              <Text className="text-2xl font-black tracking-tight text-slate-900">
-                {aluno?.nome?.split(" ")[0] ?? "Atleta"}.
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-3">
-              <TouchableOpacity
-                onPress={handleNotificationClick}
-                activeOpacity={0.7}
-                className="relative h-11 w-11 items-center justify-center rounded-full border border-slate-100 bg-slate-50"
-              >
-                <Feather name="bell" size={18} color="#0F172A" />
-                {homeData.notificacoesNaoLidas > 0 && (
-                  <View className="absolute right-1.5 top-1.5 min-h-[16px] min-w-[16px] items-center justify-center rounded-full border border-white bg-[#CC0000] px-0.5">
-                    <Text className="text-[9px] font-black text-white">
-                      {homeData.notificacoesNaoLidas}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+    }, [aluno?.id])
 
-              <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-slate-200 bg-slate-800 shadow-sm">
-                <Text className="text-base font-black tracking-tighter text-white">
-                  {getInitials(aluno?.nome ?? "Atleta")}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
+    useEffect(() => {
+        void loadHome()
+    }, [loadHome])
 
-        <View className="bg-white px-6 pb-6 pt-4">
-          <Text className="mb-6 text-xl font-black uppercase tracking-tight text-slate-900">
-            TÉCNICAS
-          </Text>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={storiesData}
-            keyExtractor={(story) => story.id}
-            contentContainerStyle={{ paddingRight: 16 }}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            windowSize={5}
-            renderItem={({ item: story, index }) => {
-              // Check if story is from last month (30 days)
-              const storyDate = new Date(story.created_at || "");
-              const now = new Date();
-              const daysDiff = Math.floor(
-                (now.getTime() - storyDate.getTime()) / (1000 * 60 * 60 * 24),
-              );
-              const isNew = daysDiff <= 30;
+    const loadNotifications = useCallback(async () => {
+        if (!aluno?.id) return
+        setNotificationsLoading(true)
+        try {
+            const data = await fetchNotificacoes(aluno.id)
+            setNotifications(data)
+        } catch (error) {
+            console.error('[Home] Erro ao carregar notificacoes:', error)
+            setNotifications([])
+        } finally {
+            setNotificationsLoading(false)
+        }
+    }, [aluno?.id])
 
-              return (
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => openStory(index)}
-                  className="mr-4 items-center"
-                >
-                  <View
-                    className={`items-center justify-center rounded-full p-[2px] ${
-                      isNew
-                        ? "bg-[#CC0000]" // Fallback solid color in case gradient doesn't work well without expo-linear-gradient
-                        : "bg-slate-200"
-                    }`}
-                    // Using inline style for the explicit gradient if nativewind allows, otherwise nativewind v4 gradients work out of the box
-                    style={{
-                      width: 84,
-                      height: 84,
-                      ...(isNew ? { backgroundColor: "transparent" } : {}),
+    const loadAgenda = useCallback(async (selectedDateISO?: string) => {
+        if (!aluno?.id) return
+        setAgendaLoading(true)
+        try {
+            const data = await fetchAgendaData(aluno.id, selectedDateISO ?? agendaData.selectedDateISO)
+            setAgendaData(data)
+        } catch (error) {
+            console.error('[Home] Erro ao carregar agenda:', error)
+            setAgendaData(buildEmptyAgendaData())
+        } finally {
+            setAgendaLoading(false)
+        }
+    }, [agendaData.selectedDateISO, aluno?.id])
+
+    const openNotifications = useCallback(async () => {
+        setNotificationsVisible(true)
+        await loadNotifications()
+    }, [loadNotifications])
+
+    const openAgenda = useCallback(async () => {
+        setAgendaVisible(true)
+        await loadAgenda()
+    }, [loadAgenda])
+
+    const handleNextClass = useCallback(async () => {
+        if (!aluno?.id || !homeData.proximaAula || savingNextClass) return
+        if (!homeData.proximaAula.agendado && !homeData.proximaAula.presenceActionEnabled) {
+            Alert.alert(
+                'Confirmacao indisponivel',
+                homeData.proximaAula.presenceRestrictionMessage ?? 'Essa aula nao pode ser confirmada agora.'
+            )
+            return
+        }
+        setSavingNextClass(true)
+        try {
+            const alreadyBooked = Boolean(homeData.proximaAula.agendado || homeData.proximaAula.presente)
+            await setPresencaStatus(aluno.id, homeData.proximaAula.id, alreadyBooked ? 'cancelada' : 'agendado')
+            await loadHome()
+        } catch (error) {
+            console.error('[Home] Erro ao atualizar proxima aula:', error)
+            Alert.alert(
+                'Erro',
+                error instanceof Error ? error.message : 'Nao foi possivel atualizar a confirmacao desta aula.'
+            )
+        } finally {
+            setSavingNextClass(false)
+        }
+    }, [aluno?.id, homeData.proximaAula, loadHome, savingNextClass])
+
+    const handleMarkAllNotifications = useCallback(async () => {
+        if (!aluno?.id) return
+        await markAllNotificacoesLidas(aluno.id)
+        setNotifications((prev) => prev.map((item) => ({ ...item, lida: true })))
+        setHomeData((prev) => ({ ...prev, notificacoesNaoLidas: 0 }))
+    }, [aluno?.id])
+
+    const handleNotificationAction = useCallback(async (notification: HomeNotification) => {
+        await markNotificacaoLida(notification.id)
+        setNotifications((prev) => prev.map((item) => (item.id === notification.id ? { ...item, lida: true } : item)))
+
+        if (notification.acao === 'pagamento' || notification.tipo === 'pagamento') {
+            setNotificationsVisible(false)
+            router.push('/pagamento')
+            return
+        }
+        if (notification.acao === 'checkin' || notification.tipo === 'aula') {
+            setNotificationsVisible(false)
+            router.push('/(tabs)/checkin')
+            return
+        }
+        if (notification.acao === 'evento' || notification.tipo === 'evento') {
+            setNotificationsVisible(false)
+            router.push('/eventos')
+            return
+        }
+        if (notification.acao === 'assistir_video' || notification.acao === 'stories' || notification.tipo === 'video') {
+            if (homeData.stories.length > 0) {
+                setNotificationsVisible(false)
+                setSelectedStory(homeData.stories[0])
+                setStoryVisible(true)
+            }
+            return
+        }
+        if (notification.link?.startsWith('/aulas/')) {
+            const aulaId = notification.link.split('/').pop()
+            if (aulaId) {
+                setNotificationsVisible(false)
+                appRouter.push(`/aula/${aulaId}`)
+                return
+            }
+        }
+        if (notification.link?.startsWith('http')) {
+            await Linking.openURL(notification.link)
+        }
+    }, [appRouter, homeData.stories])
+
+    const selectedStoryVideos = selectedStory?.videos ?? []
+    const unreadNotifications = useMemo(() => notifications.filter((item) => !item.lida).length, [notifications])
+
+    return (
+        <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+            {storyVisible && selectedStory ? (
+                <StoryViewer
+                    videos={selectedStoryVideos}
+                    title={selectedStory.nome}
+                    initialIndex={0}
+                    onClose={() => {
+                        setStoryVisible(false)
+                        setSelectedStory(null)
                     }}
-                  >
-                    {isNew && (
-                      <View className="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-400 via-red-500 to-[#CC0000]" />
-                    )}
-                    <View className="h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-100">
-                      {story.thumbnail ? (
-                        <Image
-                          source={{
-                            uri: story.thumbnail,
-                            cache: "force-cache",
-                          }}
-                          style={{ width: "100%", height: "100%" }}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View className="h-full w-full items-center justify-center bg-slate-800">
-                          <Text className="text-2xl font-black text-white opacity-50">
-                            {getInitials(story.nome)}
-                          </Text>
+                />
+            ) : null}
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+                <View
+                    style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E2E8F0',
+                        backgroundColor: '#FFFFFF',
+                        paddingBottom: 24,
+                        paddingHorizontal: 24,
+                        paddingTop: 56,
+                    }}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View
+                                style={{
+                                    marginRight: 16,
+                                    height: 50,
+                                    width: 50,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'hidden',
+                                    borderRadius: 25,
+                                    backgroundColor: '#E2E8F0',
+                                }}
+                            >
+                                {aluno?.foto_url ? (
+                                    <Image
+                                        source={{ uri: aluno.foto_url, cache: 'force-cache' }}
+                                        style={{ height: '100%', width: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>
+                                        {getInitials(aluno?.nome ?? 'Atleta')}
+                                    </Text>
+                                )}
+                            </View>
+                            <View>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        fontWeight: '800',
+                                        letterSpacing: 1.6,
+                                        color: '#94A3B8',
+                                        textTransform: 'uppercase',
+                                    }}
+                                >
+                                    Treino de hoje
+                                </Text>
+                                <Text style={{ marginTop: 4, fontSize: 22, fontWeight: '900', color: '#0F172A' }}>
+                                    {(aluno?.nome ?? 'Atleta').split(' ')[0]}.
+                                </Text>
+                            </View>
                         </View>
-                      )}
+
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => void openNotifications()}
+                            style={{
+                                height: 52,
+                                width: 52,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 26,
+                                backgroundColor: '#F8FAFC',
+                            }}
+                        >
+                            <Feather name="bell" size={20} color="#0F172A" />
+                            {homeData.notificacoesNaoLidas > 0 ? (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        right: 12,
+                                        top: 12,
+                                        height: 10,
+                                        width: 10,
+                                        borderRadius: 999,
+                                        backgroundColor: '#FB7185',
+                                    }}
+                                />
+                            ) : null}
+                        </TouchableOpacity>
                     </View>
-                  </View>
-                  <Text
-                    className="mt-2 text-[11px] font-bold text-slate-800"
-                    numberOfLines={1}
-                    style={{ maxWidth: 84, textAlign: "center" }}
-                  >
-                    {story.nome}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
+                </View>
 
-        <View className="px-6 pt-8">
-          {proximaAula ? (
-            <View className="relative mb-10 overflow-hidden rounded-3xl bg-[#0A0F1D] shadow-2xl shadow-slate-900/40">
-              {/* Time Badge in Corner */}
-              <View className="absolute right-0 top-0 h-12 w-20 items-center justify-center rounded-bl-3xl bg-[#CC0000]">
-                <Text className="text-lg font-black text-white">
-                  {proximaAula.horario}
-                </Text>
-              </View>
-
-              <View className="p-6">
-                <View className="mb-4 flex-row items-center gap-2">
-                  <View className="rounded-lg bg-slate-800 px-2 py-1">
-                    <Text className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                      HOJE
+                <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 24, paddingBottom: 24, paddingTop: 20 }}>
+                    <Text
+                        style={{
+                            marginBottom: 16,
+                            fontSize: 14,
+                            fontWeight: '800',
+                            color: '#94A3B8',
+                            textTransform: 'uppercase',
+                            letterSpacing: 1.5,
+                        }}
+                    >
+                        Tecnicas de hoje
                     </Text>
-                  </View>
-                  {(() => {
-                    const hour = parseInt(proximaAula.horario.split(":")[0]);
-                    return hour >= 18 ? (
-                      <View className="rounded-lg bg-slate-800 px-2 py-1">
-                        <Text className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                          ADULTO
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {homeData.stories.map((story) => (
+                            <TouchableOpacity
+                                key={story.id}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                    setSelectedStory(story)
+                                    setStoryVisible(true)
+                                }}
+                                style={{ marginRight: 18, width: 84, alignItems: 'center' }}
+                            >
+                                <View
+                                    style={{
+                                        borderWidth: 3,
+                                        borderColor: story.tem_novo ? '#DC2626' : '#CBD5E1',
+                                        padding: 3,
+                                        borderRadius: 999,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            height: 68,
+                                            width: 68,
+                                            overflow: 'hidden',
+                                            borderRadius: 999,
+                                            backgroundColor: '#E2E8F0',
+                                        }}
+                                    >
+                                        {story.capa_url ? (
+                                            <Image
+                                                source={{ uri: story.capa_url, cache: 'force-cache' }}
+                                                style={{ height: '100%', width: '100%' }}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <View
+                                                style={{
+                                                    flex: 1,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: '#CBD5E1',
+                                                }}
+                                            >
+                                                <Feather name="play" size={22} color="#0F172A" />
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+                                {story.tem_novo ? (
+                                    <View
+                                        style={{
+                                            position: 'absolute',
+                                            right: 6,
+                                            top: 2,
+                                            height: 12,
+                                            width: 12,
+                                            borderRadius: 999,
+                                            borderWidth: 2,
+                                            borderColor: '#FFFFFF',
+                                            backgroundColor: '#DC2626',
+                                        }}
+                                    />
+                                ) : null}
+                                <Text
+                                    numberOfLines={2}
+                                    style={{
+                                        marginTop: 10,
+                                        textAlign: 'center',
+                                        fontSize: 12,
+                                        fontWeight: '700',
+                                        color: '#0F172A',
+                                    }}
+                                >
+                                    {story.nome}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
+                    {homeData.proximaAula ? (
+                        <View style={{ overflow: 'hidden', borderRadius: 30, backgroundColor: '#08112B' }}>
+                            <View
+                                style={{
+                                    position: 'absolute',
+                                    right: 0,
+                                    top: 0,
+                                    borderBottomLeftRadius: 28,
+                                    backgroundColor: '#DC2626',
+                                    paddingHorizontal: 18,
+                                    paddingVertical: 16,
+                                }}
+                            >
+                                <Text style={{ fontSize: 18, fontWeight: '900', color: '#FFFFFF' }}>
+                                    {homeData.proximaAula.horario}
+                                </Text>
+                            </View>
+
+                            <View style={{ padding: 24 }}>
+                                <Text
+                                    style={{
+                                        marginBottom: 8,
+                                        fontSize: 11,
+                                        fontWeight: '800',
+                                        letterSpacing: 1.5,
+                                        color: '#94A3B8',
+                                        textTransform: 'uppercase',
+                                    }}
+                                >
+                                    Proxima aula
+                                </Text>
+                                <Text style={{ fontSize: 30, fontWeight: '900', color: '#FFFFFF' }}>
+                                    {homeData.proximaAula.nome.toUpperCase()}
+                                </Text>
+                                <Text style={{ marginTop: 8, fontSize: 15, fontWeight: '600', color: '#CBD5E1' }}>
+                                    {homeData.proximaAula.professor}
+                                </Text>
+                                <Text style={{ marginTop: 6, fontSize: 12, color: '#94A3B8' }}>
+                                    {homeData.proximaAula.vagas_ocupadas}/{homeData.proximaAula.vagas_total} alunos
+                                </Text>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    disabled={savingNextClass}
+                                    onPress={() => void handleNextClass()}
+                                    style={{
+                                        marginTop: 22,
+                                        borderRadius: 18,
+                                        backgroundColor:
+                                            homeData.proximaAula.agendado || homeData.proximaAula.presente
+                                                ? '#172036'
+                                                : homeData.proximaAula.presenceActionEnabled
+                                                    ? '#DC2626'
+                                                    : '#334155',
+                                        paddingVertical: 16,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    {savingNextClass ? (
+                                        <ActivityIndicator color="#FFFFFF" />
+                                    ) : (
+                                        <Text
+                                            style={{
+                                                fontSize: 12,
+                                                fontWeight: '900',
+                                                letterSpacing: 1.4,
+                                                color: '#FFFFFF',
+                                                textTransform: 'uppercase',
+                                            }}
+                                        >
+                                            {homeData.proximaAula.presenceActionLabel ??
+                                                (homeData.proximaAula.agendado || homeData.proximaAula.presente
+                                                    ? 'Cancelar presenca'
+                                                    : 'Confirmar presenca')}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : loading ? (
+                        <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+                            <ActivityIndicator color="#DC2626" />
+                        </View>
+                    ) : null}
+                </View>
+
+                <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
+                    <View
+                        style={{
+                            marginBottom: 16,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                        }}
+                    >
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
+                            Agenda
                         </Text>
-                      </View>
-                    ) : null;
-                  })()}
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => void openAgenda()}
+                            style={{
+                                height: 44,
+                                width: 44,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 22,
+                                backgroundColor: '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                            }}
+                        >
+                            <Feather name="calendar" size={18} color="#0F172A" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {homeData.proximasAulas.map((aula) => (
+                            <TouchableOpacity
+                                key={aula.id}
+                                activeOpacity={0.88}
+                                onPress={() => appRouter.push(`/aula/${aula.id}`)}
+                                style={{
+                                    marginRight: 14,
+                                    width: 244,
+                                    borderRadius: 24,
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0',
+                                    backgroundColor: '#FFFFFF',
+                                    padding: 18,
+                                }}
+                            >
+                                <Text style={{ fontSize: 28, fontWeight: '900', color: '#0F172A' }}>
+                                    {aula.horario}
+                                </Text>
+                                <Text style={{ marginTop: 10, fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
+                                    {aula.nome}
+                                </Text>
+                                <Text style={{ marginTop: 6, fontSize: 14, color: '#64748B' }}>
+                                    {aula.professor}
+                                </Text>
+                                <Text style={{ marginTop: 14, fontSize: 12, fontWeight: '700', color: '#94A3B8' }}>
+                                    {aula.data} • {aula.vagas_ocupadas}/{aula.vagas_total}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </View>
 
-                <Text className="mb-1 text-2xl font-black tracking-tight text-white">
-                  AULA DE BOXE
-                </Text>
-
-                <View className="mb-5 flex-row items-center">
-                  <Feather name="user" size={12} color="#CC0000" />
-                  <Text className="ml-1.5 text-sm font-bold text-slate-400">
-                    {proximaAula.professor}
-                  </Text>
-                  <View className="mx-2 h-1 w-1 rounded-full bg-slate-700" />
-                  <Text className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    {proximaAula.vagas_ocupadas}/{proximaAula.vagas_total}{" "}
-                    ALUNOS
-                  </Text>
-                </View>
-
-                <Animated.View style={{ transform: [{ scale: heroScale }] }}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => handleConfirmar(proximaAula.id)}
-                    className={`h-12 flex-row items-center justify-center rounded-xl ${
-                      isAulaConfirmada
-                        ? "border border-white/10 bg-slate-800"
-                        : "bg-[#CC0000]"
-                    }`}
-                  >
-                    <Text className="text-sm font-black uppercase tracking-widest text-white">
-                      {isAulaConfirmada ? "CANCELAR PRESENCA" : "BATER O PONTO"}
+                <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
+                    <Text style={{ marginBottom: 14, fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
+                        Avisos
                     </Text>
-                    {!isAulaConfirmada && (
-                      <Feather
-                        name="x"
-                        size={16}
-                        color="white"
-                        style={{ marginLeft: 8 }}
-                      />
-                    )}
-                  </TouchableOpacity>
-                </Animated.View>
-              </View>
-            </View>
-          ) : (
-            <View className="mb-10 rounded-3xl bg-slate-900 p-8">
-              <Text className="text-sm font-medium text-slate-400">
-                Nenhuma aula disponivel nos proximos horarios.
-              </Text>
-            </View>
-          )}
-
-          <View className="mb-10">
-            <View className="mb-6 flex-row items-baseline justify-between">
-              <Text className="text-xl font-bold tracking-tight text-slate-900">
-                Aulas
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.6}
-                onPress={() => router.push("/(tabs)/checkin")}
-              >
-                <Text className="text-sm font-bold text-[#CC0000]">
-                  Ver todas
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="-mx-6 px-6"
-              contentContainerStyle={{ paddingRight: 40 }}
-            >
-              {homeData.aulasHoje.map((aula) => (
-                <AulaHojeItem
-                  key={aula.id}
-                  aula={aula}
-                  onPress={handleAulaPress}
-                  onAgendarOuCancelar={handleAgendarOuCancelar}
-                  currentMinutes={currentMinutes}
-                />
-              ))}
+                    {homeData.avisos.map((aviso) => (
+                        <View
+                            key={aviso.id}
+                            style={{
+                                marginBottom: 12,
+                                borderRadius: 22,
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                backgroundColor: '#FFFFFF',
+                                padding: 18,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    letterSpacing: 1.4,
+                                    color: '#94A3B8',
+                                    textTransform: 'uppercase',
+                                }}
+                            >
+                                {aviso.data}
+                            </Text>
+                            <Text style={{ marginTop: 8, fontSize: 16, fontWeight: '900', color: '#0F172A' }}>
+                                {aviso.titulo}
+                            </Text>
+                            <Text style={{ marginTop: 10, fontSize: 14, lineHeight: 20, color: '#64748B' }}>
+                                {aviso.texto}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
             </ScrollView>
-          </View>
 
-          <View className="mb-10">
-            <Text className="mb-6 text-xl font-bold tracking-tight text-slate-900">
-              Avisos do CT
-            </Text>
-            {homeData.avisos.length === 0 && !loading ? (
-              <View className="rounded-2xl border border-slate-100 bg-white p-5">
-                <Text className="text-sm text-slate-500">
-                  Nenhum aviso publicado no momento.
-                </Text>
-              </View>
-            ) : (
-              homeData.avisos.map((aviso) => (
-                <AvisoItem
-                  key={aviso.id}
-                  aviso={aviso}
-                  isExpanded={expandedAvisoId === aviso.id}
-                  onToggle={toggleAviso}
-                />
-              ))
-            )}
-          </View>
+            <BottomSheetModal visible={notificationsVisible} onClose={() => setNotificationsVisible(false)}>
+                <View style={{ paddingHorizontal: 24 }}>
+                    <View
+                        style={{
+                            marginBottom: 18,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
+                                Notificacoes
+                            </Text>
+                            {unreadNotifications > 0 ? (
+                                <View
+                                    style={{
+                                        marginLeft: 10,
+                                        borderRadius: 10,
+                                        backgroundColor: '#FEE2E2',
+                                        paddingHorizontal: 8,
+                                        paddingVertical: 4,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 10,
+                                            fontWeight: '900',
+                                            color: '#DC2626',
+                                            textTransform: 'uppercase',
+                                        }}
+                                    >
+                                        {unreadNotifications} novas
+                                    </Text>
+                                </View>
+                            ) : null}
+                        </View>
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => setNotificationsVisible(false)}
+                            style={{
+                                height: 40,
+                                width: 40,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 20,
+                                backgroundColor: '#F1F5F9',
+                            }}
+                        >
+                            <Feather name="x" size={20} color="#64748B" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {notificationsLoading ? (
+                        <View style={{ paddingVertical: 36, alignItems: 'center' }}>
+                            <ActivityIndicator color="#DC2626" />
+                        </View>
+                    ) : (
+                        <ScrollView style={{ maxHeight: 480 }} showsVerticalScrollIndicator={false}>
+                            {notifications.map((notification) => {
+                                const icon = resolveNotificationIcon(notification.icone, notification.tipo)
+                                return (
+                                    <TouchableOpacity
+                                        key={notification.id}
+                                        activeOpacity={0.88}
+                                        onPress={() => void handleNotificationAction(notification)}
+                                        style={{
+                                            marginBottom: 12,
+                                            borderRadius: 20,
+                                            borderWidth: 1,
+                                            borderColor: '#E2E8F0',
+                                            backgroundColor: '#FFFFFF',
+                                            padding: 16,
+                                        }}
+                                    >
+                                        <View style={{ flexDirection: 'row' }}>
+                                            <View
+                                                style={{
+                                                    marginRight: 14,
+                                                    height: 44,
+                                                    width: 44,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderRadius: 22,
+                                                    backgroundColor: icon.tone.backgroundColor,
+                                                }}
+                                            >
+                                                <NotificationIcon icon={icon.icon} size={18} color={icon.tone.color} />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    <Text style={{ flex: 1, fontSize: 17, fontWeight: '900', color: '#0F172A' }}>
+                                                        {notification.titulo}
+                                                    </Text>
+                                                    <Text style={{ marginLeft: 12, fontSize: 12, fontWeight: '700', color: '#94A3B8' }}>
+                                                        {notification.horario}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ marginTop: 8, fontSize: 14, lineHeight: 20, color: '#475569' }}>
+                                                    {notification.subtitulo}
+                                                </Text>
+                                                {notification.actionLabel ? (
+                                                    <Text style={{ marginTop: 12, fontSize: 14, fontWeight: '800', color: '#DC2626' }}>
+                                                        {notification.actionLabel} {'>'}
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                )
+                            })}
+
+                            {notifications.length === 0 ? (
+                                <View style={{ paddingVertical: 36, alignItems: 'center' }}>
+                                    <Feather name="check-circle" size={34} color="#CBD5E1" />
+                                    <Text style={{ marginTop: 12, fontSize: 15, fontWeight: '700', color: '#94A3B8' }}>
+                                        Tudo em dia
+                                    </Text>
+                                </View>
+                            ) : null}
+                        </ScrollView>
+                    )}
+
+                    {notifications.length > 0 ? (
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => void handleMarkAllNotifications()}
+                            style={{
+                                marginTop: 10,
+                                borderRadius: 18,
+                                backgroundColor: '#F1F5F9',
+                                paddingVertical: 16,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 13,
+                                    fontWeight: '900',
+                                    letterSpacing: 1.2,
+                                    color: '#64748B',
+                                    textTransform: 'uppercase',
+                                }}
+                            >
+                                Marcar tudo como lido
+                            </Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+            </BottomSheetModal>
+
+            <BottomSheetModal visible={agendaVisible} onClose={() => setAgendaVisible(false)}>
+                <View style={{ paddingHorizontal: 24 }}>
+                    <View
+                        style={{
+                            marginBottom: 18,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <View>
+                            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
+                                Agenda
+                            </Text>
+                            <Text style={{ marginTop: 4, fontSize: 14, color: '#94A3B8' }}>
+                                {agendaData.selectedLabel || 'Selecione um dia'}
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => setAgendaVisible(false)}
+                            style={{
+                                height: 40,
+                                width: 40,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 20,
+                                backgroundColor: '#F1F5F9',
+                            }}
+                        >
+                            <Feather name="x" size={20} color="#64748B" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
+                        {agendaData.dias.map((dia) => {
+                            const active = dia.iso === agendaData.selectedDateISO
+                            return (
+                                <TouchableOpacity
+                                    key={dia.iso}
+                                    activeOpacity={0.85}
+                                    onPress={() => void loadAgenda(dia.iso)}
+                                    style={{
+                                        marginRight: 12,
+                                        width: 76,
+                                        borderRadius: 20,
+                                        borderWidth: 1,
+                                        borderColor: active ? '#DC2626' : '#CBD5E1',
+                                        backgroundColor: active ? '#DC2626' : '#FFFFFF',
+                                        paddingVertical: 12,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 11,
+                                            fontWeight: '800',
+                                            color: active ? '#FEE2E2' : '#94A3B8',
+                                            textTransform: 'uppercase',
+                                        }}
+                                    >
+                                        {dia.shortLabel}
+                                    </Text>
+                                    <Text style={{ marginTop: 6, fontSize: 28, fontWeight: '900', color: active ? '#FFFFFF' : '#94A3B8' }}>
+                                        {dia.dayNumber}
+                                    </Text>
+                                </TouchableOpacity>
+                            )
+                        })}
+                    </ScrollView>
+
+                    {agendaLoading ? (
+                        <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                            <ActivityIndicator color="#DC2626" />
+                        </View>
+                    ) : (
+                        <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+                            {agendaData.aulas.map((aula) => (
+                                <TouchableOpacity
+                                    key={aula.id}
+                                    activeOpacity={0.88}
+                                    onPress={() => {
+                                        setAgendaVisible(false)
+                                        appRouter.push(`/aula/${aula.id}`)
+                                    }}
+                                    style={{
+                                        marginBottom: 10,
+                                        borderRadius: 18,
+                                        borderWidth: 1,
+                                        borderColor: '#E2E8F0',
+                                        backgroundColor: '#FFFFFF',
+                                        padding: 16,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 24, fontWeight: '900', color: '#0F172A' }}>{aula.horario}</Text>
+                                    <Text style={{ marginTop: 8, fontSize: 16, fontWeight: '900', color: '#0F172A' }}>{aula.nome}</Text>
+                                    <Text style={{ marginTop: 6, fontSize: 14, color: '#64748B' }}>{aula.professor}</Text>
+                                </TouchableOpacity>
+                            ))}
+                            {agendaData.aulas.length === 0 ? (
+                                <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 14, color: '#94A3B8' }}>Nenhuma aula nessa data</Text>
+                                </View>
+                            ) : null}
+                        </ScrollView>
+                    )}
+
+                    <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => {
+                            setAgendaVisible(false)
+                            router.replace('/(tabs)/checkin')
+                        }}
+                        style={{
+                            marginTop: 12,
+                            borderRadius: 18,
+                            backgroundColor: '#0F172A',
+                            paddingVertical: 16,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                fontSize: 13,
+                                fontWeight: '900',
+                                letterSpacing: 1.2,
+                                color: '#FFFFFF',
+                                textTransform: 'uppercase',
+                            }}
+                        >
+                            Abrir agenda completa
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </BottomSheetModal>
         </View>
-      </ScrollView>
-    </View>
-  );
+    )
 }
-

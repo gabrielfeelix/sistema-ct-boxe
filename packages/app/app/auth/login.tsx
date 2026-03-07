@@ -1,4 +1,5 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
+import { Redirect } from 'expo-router'
 import { useState } from 'react'
 import {
     Alert,
@@ -15,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginScreen() {
-    const { signIn } = useAuth()
+    const { loading: authLoading, session, signIn } = useAuth()
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -66,43 +67,91 @@ export default function LoginScreen() {
         Alert.alert('Recuperar senha', 'Um link de recuperacao foi enviado para seu e-mail.')
     }
 
+    if (!authLoading && session) {
+        return <Redirect href="/(tabs)" />
+    }
+
     return (
-        <View className="flex-1 bg-[#FDFDFD]">
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <View style={{ flex: 1, backgroundColor: '#FDFDFD' }}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <ScrollView
                     contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
                     showsVerticalScrollIndicator={false}
                 >
-                    <View className="relative flex-1 justify-center px-8">
-                        <View className="absolute -right-20 top-10 opacity-5">
+                    <View style={{ position: 'relative', flex: 1, justifyContent: 'center', paddingHorizontal: 32 }}>
+                        <View style={{ position: 'absolute', right: -80, top: 40, opacity: 0.05 }}>
                             <FontAwesome5 name="fire" size={300} color="#0F172A" />
                         </View>
 
-                        <View className="mb-16 items-center">
-                            <View className="mb-8 h-20 w-20 items-center justify-center rounded-[1.5rem] bg-slate-900 shadow-2xl shadow-slate-900/20">
-                                <Text className="text-3xl font-black tracking-tighter text-white">CT</Text>
+                        <View style={{ marginBottom: 64, alignItems: 'center' }}>
+                            <View
+                                style={{
+                                    marginBottom: 32,
+                                    height: 80,
+                                    width: 80,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 24,
+                                    backgroundColor: '#0F172A',
+                                }}
+                            >
+                                <Text style={{ fontSize: 30, fontWeight: '900', color: '#FFFFFF' }}>CT</Text>
                             </View>
-                            <Text className="text-center text-4xl font-black tracking-tight text-slate-900">
+                            <Text style={{ textAlign: 'center', fontSize: 36, fontWeight: '900', color: '#0F172A' }}>
                                 Argel Riboli
                             </Text>
-                            <Text className="mt-2 text-center text-xs font-bold uppercase tracking-[0.3em] text-slate-400">
+                            <Text
+                                style={{
+                                    marginTop: 8,
+                                    textAlign: 'center',
+                                    fontSize: 12,
+                                    fontWeight: '700',
+                                    color: '#94A3B8',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 3,
+                                }}
+                            >
                                 Centro de Treinamento
                             </Text>
                         </View>
 
-                        <View className="space-y-6">
-                            <View className="mb-5">
-                                <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-slate-500">
+                        <View>
+                            <View style={{ marginBottom: 20 }}>
+                                <Text
+                                    style={{
+                                        marginBottom: 8,
+                                        marginLeft: 4,
+                                        fontSize: 12,
+                                        fontWeight: '700',
+                                        color: '#64748B',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: 1.5,
+                                    }}
+                                >
                                     Usuario / Email
                                 </Text>
                                 <View
-                                    className={`h-16 flex-row items-center rounded-2xl border-[1.5px] bg-white px-5 shadow-sm shadow-slate-200/50 ${
-                                        errors.email ? 'border-red-500 bg-red-50/50' : 'border-slate-100'
-                                    }`}
+                                    style={{
+                                        height: 64,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        borderRadius: 16,
+                                        borderWidth: 1.5,
+                                        borderColor: errors.email ? '#EF4444' : '#E2E8F0',
+                                        backgroundColor: errors.email ? '#FEF2F2' : '#FFFFFF',
+                                        paddingHorizontal: 20,
+                                    }}
                                 >
                                     <Feather name="mail" size={18} color={errors.email ? '#CC0000' : '#94A3B8'} />
                                     <TextInput
-                                        className="ml-3 h-full flex-1 text-base font-medium text-slate-900"
+                                        style={{
+                                            marginLeft: 12,
+                                            height: '100%',
+                                            flex: 1,
+                                            fontSize: 16,
+                                            fontWeight: '500',
+                                            color: '#0F172A',
+                                        }}
                                         placeholder="E-mail de acesso"
                                         placeholderTextColor="#CBD5E1"
                                         value={email}
@@ -115,27 +164,56 @@ export default function LoginScreen() {
                                     />
                                 </View>
                                 {errors.email ? (
-                                    <Text className="ml-2 mt-2 text-xs font-black uppercase tracking-wide text-red-500">
-                                        {errors.email}
-                                    </Text>
+                                    <Text style={{ marginLeft: 8, marginTop: 8, fontSize: 12, fontWeight: '800', color: '#EF4444' }}>{errors.email}</Text>
                                 ) : null}
                             </View>
 
-                            <View className="mb-10">
-                                <View className="mb-2 flex-row items-center justify-between px-1">
-                                    <Text className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                            <View style={{ marginBottom: 40 }}>
+                                <View
+                                    style={{
+                                        marginBottom: 8,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        paddingHorizontal: 4,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: '700',
+                                            color: '#64748B',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: 1.5,
+                                        }}
+                                    >
                                         Senha
                                     </Text>
                                     <TouchableOpacity onPress={handleForgotPassword} activeOpacity={0.6}>
-                                        <Text className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                        <Text
+                                            style={{
+                                                fontSize: 10,
+                                                fontWeight: '700',
+                                                color: '#94A3B8',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: 1.5,
+                                            }}
+                                        >
                                             Esqueci a senha
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
                                 <View
-                                    className={`h-16 flex-row items-center rounded-2xl border-[1.5px] bg-white px-5 shadow-sm shadow-slate-200/50 ${
-                                        errors.password ? 'border-red-500 bg-red-50/50' : 'border-slate-100'
-                                    }`}
+                                    style={{
+                                        height: 64,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        borderRadius: 16,
+                                        borderWidth: 1.5,
+                                        borderColor: errors.password ? '#EF4444' : '#E2E8F0',
+                                        backgroundColor: errors.password ? '#FEF2F2' : '#FFFFFF',
+                                        paddingHorizontal: 20,
+                                    }}
                                 >
                                     <Feather
                                         name="lock"
@@ -143,7 +221,14 @@ export default function LoginScreen() {
                                         color={errors.password ? '#CC0000' : '#94A3B8'}
                                     />
                                     <TextInput
-                                        className="ml-3 h-full flex-1 text-base font-medium text-slate-900"
+                                        style={{
+                                            marginLeft: 12,
+                                            height: '100%',
+                                            flex: 1,
+                                            fontSize: 16,
+                                            fontWeight: '500',
+                                            color: '#0F172A',
+                                        }}
                                         placeholder="Sua senha secreta"
                                         placeholderTextColor="#CBD5E1"
                                         value={password}
@@ -158,15 +243,22 @@ export default function LoginScreen() {
                                     <TouchableOpacity
                                         activeOpacity={0.6}
                                         onPress={() => setShowPassword((prev) => !prev)}
-                                        className="-mr-2 h-10 w-10 items-center justify-center rounded-full bg-slate-50 p-2"
+                                        style={{
+                                            marginRight: -8,
+                                            height: 40,
+                                            width: 40,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderRadius: 999,
+                                            backgroundColor: '#F8FAFC',
+                                            padding: 8,
+                                        }}
                                     >
                                         <Feather name={showPassword ? 'eye' : 'eye-off'} size={16} color="#64748B" />
                                     </TouchableOpacity>
                                 </View>
                                 {errors.password ? (
-                                    <Text className="ml-2 mt-2 text-xs font-black uppercase tracking-wide text-red-500">
-                                        {errors.password}
-                                    </Text>
+                                    <Text style={{ marginLeft: 8, marginTop: 8, fontSize: 12, fontWeight: '800', color: '#EF4444' }}>{errors.password}</Text>
                                 ) : null}
                             </View>
 
@@ -174,14 +266,39 @@ export default function LoginScreen() {
                                 activeOpacity={0.8}
                                 onPress={handleLogin}
                                 disabled={loading}
-                                className="relative h-16 w-full flex-row items-center justify-center overflow-hidden rounded-2xl bg-[#CC0000] shadow-lg shadow-red-900/30"
-                                style={{ opacity: loading ? 0.7 : 1 }}
+                                style={{
+                                    position: 'relative',
+                                    height: 64,
+                                    width: '100%',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'hidden',
+                                    borderRadius: 16,
+                                    backgroundColor: '#CC0000',
+                                    opacity: loading ? 0.7 : 1,
+                                }}
                             >
                                 <View
-                                    className="absolute bottom-0 right-0 top-0 w-24 bg-white/10"
-                                    style={{ transform: [{ skewX: '-30deg' }, { translateX: 20 }] }}
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        right: 0,
+                                        top: 0,
+                                        width: 96,
+                                        backgroundColor: 'rgba(255,255,255,0.10)',
+                                        transform: [{ skewX: '-30deg' }, { translateX: 20 }],
+                                    }}
                                 />
-                                <Text className="text-base font-black uppercase tracking-widest text-white">
+                                <Text
+                                    style={{
+                                        fontSize: 16,
+                                        fontWeight: '900',
+                                        color: '#FFFFFF',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: 2,
+                                    }}
+                                >
                                     {loading ? 'Entrando...' : 'Entrar no App'}
                                 </Text>
                                 {!loading && (

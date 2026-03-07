@@ -1,12 +1,5 @@
 import type { Session, User } from '@supabase/supabase-js'
-import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
-} from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import { supabase } from '@/lib/supabase'
 import type { AlunoProfile } from '@/lib/types'
@@ -25,24 +18,31 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-// Timeout helper
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-    return Promise.race([
-        promise,
-        new Promise<T>((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs)
-        ),
-    ])
+function withTimeout<T>(promiseLike: PromiseLike<T>, ms: number, label: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error(`[Auth] Timeout em ${label} apos ${ms}ms`))
+        }, ms)
+
+        Promise.resolve(promiseLike)
+            .then((value) => {
+                clearTimeout(timeoutId)
+                resolve(value)
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId)
+                reject(error)
+            })
+    })
 }
 
 async function fetchAlunoProfile(user: User): Promise<AlunoProfile | null> {
     try {
-        // Timeout de 10 segundos para evitar travamento
         const byId = await withTimeout(
             supabase.from('alunos').select('*').eq('id', user.id).maybeSingle(),
-            10000
+            5000,
+            'busca de aluno por id'
         )
-
         if (byId.error) {
             console.error('[Auth] Falha ao buscar aluno por id:', byId.error.message)
         }
@@ -52,7 +52,8 @@ async function fetchAlunoProfile(user: User): Promise<AlunoProfile | null> {
 
         const byEmail = await withTimeout(
             supabase.from('alunos').select('*').eq('email', user.email.toLowerCase()).maybeSingle(),
-            10000
+            5000,
+            'busca de aluno por email'
         )
 
         if (byEmail.error) {
@@ -77,77 +78,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setAluno(null)
             return
         }
+
         const profile = await fetchAlunoProfile(currentUser)
         setAluno(profile)
     }, [session?.user])
 
     useEffect(() => {
         let active = true
+        let resolved = false
+        let bootstrapTimeoutId: ReturnType<typeof setTimeout> | null = null
 
-        async function resolveSession(nextSession: Session | null) {
+        async function hydrateAluno(nextSession: Session | null) {
             if (!active) return
 
-            setLoading(true)
+            if (!nextSession?.user) {
+                setAluno(null)
+                return
+            }
+
+            const profile = await fetchAlunoProfile(nextSession.user)
+            if (!active) return
+            setAluno(profile)
+        }
+
+        function resolveSession(nextSession: Session | null) {
+            if (!active) return
+            resolved = true
+
             setSession(nextSession)
+            setLoading(false)
 
-            try {
-                if (nextSession?.user) {
-                    const profile = await fetchAlunoProfile(nextSession.user)
+            if (nextSession?.user) {
+                setTimeout(() => {
                     if (!active) return
-                    setAluno(profile)
-                } else {
-                    setAluno(null)
-                }
-            } catch (error) {
-                if (!active) return
-                console.error('[Auth] Erro ao resolver sessão:', error)
+                    void hydrateAluno(nextSession)
+                }, 0)
+            } else {
                 setAluno(null)
-            } finally {
-                if (active) setLoading(false)
             }
         }
 
-        async function bootstrap() {
-            try {
-                // Timeout de 15s para evitar travamento em rede ruim
-                const {
-                    data: { session: currentSession },
-                } = await withTimeout(supabase.auth.getSession(), 15000)
-
-                if (!active) return
-                await resolveSession(currentSession)
-            } catch (error) {
-                if (!active) return
-                console.error('[Auth] Erro no bootstrap da sessão:', error)
-                // CRÍTICO: Sempre finalizar loading mesmo em erro
-                setSession(null)
-                setAluno(null)
-                setLoading(false)
-            }
-        }
-
-        // Timeout de fallback caso tudo falhe
-        const fallbackTimeout = setTimeout(() => {
-            if (active && loading) {
-                console.warn('[Auth] Timeout de fallback - forçando loading=false após 20s')
-                setLoading(false)
-            }
-        }, 20000)
-
-        bootstrap()
+        bootstrapTimeoutId = setTimeout(() => {
+            if (!active) return
+            console.warn('[Auth] Bootstrap da sessao demorou demais; liberando UI sem sessao persistida.')
+            setSession(null)
+            setAluno(null)
+            setLoading(false)
+        }, 5000)
 
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-            await resolveSession(nextSession)
+        } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+            if (bootstrapTimeoutId) {
+                clearTimeout(bootstrapTimeoutId)
+                bootstrapTimeoutId = null
+            }
+            resolveSession(nextSession)
         })
+
+        setTimeout(() => {
+            if (!active || resolved) return
+            void withTimeout(supabase.auth.getSession(), 2000, 'bootstrap de apoio da sessao')
+                .then(({ data: { session: currentSession } }) => {
+                    if (!active) return
+                    resolveSession(currentSession)
+                })
+                .catch((error) => {
+                    if (!active) return
+                    console.warn('[Auth] Bootstrap auxiliar da sessao falhou:', error)
+                })
+        }, 0)
 
         return () => {
             active = false
-            clearTimeout(fallbackTimeout)
-            if (subscription?.unsubscribe) {
-                subscription.unsubscribe()
+            if (bootstrapTimeoutId) {
+                clearTimeout(bootstrapTimeoutId)
             }
+            subscription?.unsubscribe?.()
         }
     }, [])
 

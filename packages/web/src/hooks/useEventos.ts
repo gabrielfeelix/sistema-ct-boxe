@@ -10,6 +10,8 @@ export interface Evento {
     data_evento: string
     local: string
     icone: string // 'churras' | 'boxe' | 'social' | 'treino'
+    valor?: number | null
+    imagem_url?: string | null
     destaque: boolean
     ativo: boolean
     confirmados: number
@@ -23,6 +25,8 @@ export interface EventoFormValues {
     data_evento: string
     local: string
     icone: string
+    valor?: number | null
+    imagem_url?: string | null
     destaque: boolean
 }
 
@@ -58,6 +62,8 @@ export function useEventos() {
                 data_evento: values.data_evento,
                 local: values.local,
                 icone: values.icone,
+                valor: values.valor ?? null,
+                imagem_url: values.imagem_url ?? null,
                 destaque: values.destaque,
                 ativo: true,
                 confirmados: 0,

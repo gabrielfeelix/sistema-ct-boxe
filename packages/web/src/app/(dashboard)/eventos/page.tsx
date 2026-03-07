@@ -113,6 +113,16 @@ export default function EventosPage() {
                                 key={evento.id}
                                 className="group relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md"
                             >
+                                {evento.imagem_url ? (
+                                    <div className="mb-5 overflow-hidden rounded-2xl border border-gray-100">
+                                        <img
+                                            src={evento.imagem_url}
+                                            alt={evento.titulo}
+                                            className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                                        />
+                                    </div>
+                                ) : null}
+
                                 {evento.destaque && (
                                     <div className="absolute right-4 top-4">
                                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
@@ -139,6 +149,9 @@ export default function EventosPage() {
                                     <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                                         <MapPin className="h-4 w-4 text-gray-400" />
                                         {evento.local}
+                                    </div>
+                                    <div className="text-sm font-semibold text-gray-500">
+                                        {evento.valor ? `Valor: R$ ${Number(evento.valor).toFixed(2)}` : 'Evento gratuito'}
                                     </div>
                                 </div>
 

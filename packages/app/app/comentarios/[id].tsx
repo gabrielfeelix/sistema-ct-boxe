@@ -1,10 +1,10 @@
 import { Feather } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Children, useCallback, useEffect, useState } from 'react'
+import { Children, useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchSinglePost, toggleFeedLike } from '@/lib/appData'
+import { addFeedComment, fetchSinglePost } from '@/lib/appData'
 import type { FeedPost } from '@/lib/types'
 
 export default function ComentariosModal() {
@@ -16,6 +16,13 @@ export default function ComentariosModal() {
     const [loading, setLoading] = useState(true)
     const [comentarioTexto, setComentarioTexto] = useState('')
     const [saving, setSaving] = useState(false)
+    const mountedRef = useRef(true)
+
+    useEffect(() => {
+        return () => {
+            mountedRef.current = false
+        }
+    }, [])
 
     const loadData = useCallback(async () => {
         if (!aluno?.id || !id) {
@@ -42,28 +49,53 @@ export default function ComentariosModal() {
     const handleSendComentario = async () => {
         if (!comentarioTexto.trim() || saving || !post || !aluno) return
 
+        const texto = comentarioTexto.trim()
+        const optimisticId = `temp-${Date.now()}`
+        const optimisticComment = {
+            id: optimisticId,
+            autor: aluno.nome || 'Eu',
+            iniciais: aluno.nome ? aluno.nome.charAt(0).toUpperCase() : 'E',
+            data: 'Agora',
+            texto,
+        }
+
         setSaving(true)
-        // Aqui simularíamos o envio à API, por enquanto local.
-        setTimeout(() => {
-            setPost(prev => {
+        setComentarioTexto('')
+        setPost((prev) => {
+            if (!prev) return prev
+            return {
+                ...prev,
+                comentarios: [optimisticComment, ...prev.comentarios],
+            }
+        })
+
+        try {
+            await addFeedComment(post.id, aluno.id, texto)
+            const updatedPost = await fetchSinglePost(aluno.id, post.id)
+
+            if (!mountedRef.current) return
+
+            if (updatedPost) {
+                setPost(updatedPost)
+            }
+        } catch (error) {
+            console.error('[Comentarios] Erro ao enviar comentario:', error)
+
+            if (!mountedRef.current) return
+
+            setPost((prev) => {
                 if (!prev) return prev
                 return {
                     ...prev,
-                    comentarios: [
-                        ...prev.comentarios,
-                        {
-                            id: Math.random().toString(),
-                            autor: aluno.nome || 'Eu',
-                            iniciais: aluno.nome ? aluno.nome.charAt(0).toUpperCase() : 'E',
-                            data: 'Agora',
-                            texto: comentarioTexto.trim(),
-                        }
-                    ]
+                    comentarios: prev.comentarios.filter((comentario) => comentario.id !== optimisticId),
                 }
             })
-            setComentarioTexto('')
-            setSaving(false)
-        }, 500)
+            Alert.alert('Erro', 'Nao foi possivel enviar o comentario.')
+        } finally {
+            if (mountedRef.current) {
+                setSaving(false)
+            }
+        }
     }
 
     if (loading) {

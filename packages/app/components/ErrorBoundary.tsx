@@ -1,5 +1,5 @@
 import React, { Component, ReactNode } from 'react'
-import { Text, TouchableOpacity, View, ScrollView } from 'react-native'
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Feather } from '@expo/vector-icons'
 
 interface Props {
@@ -25,6 +25,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
         console.error('[ErrorBoundary] Caught error:', error, errorInfo)
+        if (errorInfo.componentStack) {
+            console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack)
+        }
         this.setState({ errorInfo })
     }
 
@@ -41,25 +44,68 @@ export class ErrorBoundary extends Component<Props, State> {
             const isDev = __DEV__
 
             return (
-                <View className="flex-1 items-center justify-center bg-[#FDFDFD] px-6">
-                    <View className="mb-6 h-20 w-20 items-center justify-center rounded-3xl border border-red-100 bg-red-50">
+                <View
+                    style={{
+                        flex: 1,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#FDFDFD',
+                        paddingHorizontal: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            marginBottom: 24,
+                            height: 80,
+                            width: 80,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 24,
+                            borderWidth: 1,
+                            borderColor: '#FECACA',
+                            backgroundColor: '#FEF2F2',
+                        }}
+                    >
                         <Feather name="alert-triangle" size={32} color="#DC2626" />
                     </View>
-                    <Text className="mb-2 text-2xl font-black tracking-tight text-slate-900">Ops!</Text>
-                    <Text className="mb-8 max-w-sm text-center text-sm font-medium leading-relaxed text-slate-500">
+                    <Text
+                        style={{
+                            marginBottom: 8,
+                            fontSize: 28,
+                            fontWeight: '900',
+                            color: '#0F172A',
+                        }}
+                    >
+                        Ops!
+                    </Text>
+                    <Text
+                        style={{
+                            marginBottom: 32,
+                            maxWidth: 320,
+                            textAlign: 'center',
+                            fontSize: 14,
+                            fontWeight: '500',
+                            lineHeight: 20,
+                            color: '#64748B',
+                        }}
+                    >
                         Algo deu errado. Tente novamente ou volte mais tarde.
                     </Text>
 
-                    {/* Mostrar detalhes do erro em desenvolvimento */}
                     {isDev && this.state.error && (
-                        <ScrollView className="mb-6 w-full max-h-40 rounded-xl bg-slate-50 p-4">
-                            <Text className="text-xs font-mono text-red-600">
-                                {this.state.error.toString()}
-                            </Text>
+                        <ScrollView
+                            style={{
+                                marginBottom: 24,
+                                width: '100%',
+                                maxHeight: 160,
+                                borderRadius: 12,
+                                backgroundColor: '#F8FAFC',
+                                padding: 16,
+                            }}
+                        >
+                            <Text style={{ fontSize: 12, color: '#DC2626' }}>{this.state.error.toString()}</Text>
                             {this.state.error.stack && (
-                                <Text className="mt-2 text-[10px] font-mono text-slate-600">
-                                    {this.state.error.stack}
-                                </Text>
+                                <Text style={{ marginTop: 8, fontSize: 10, color: '#475569' }}>{this.state.error.stack}</Text>
                             )}
                         </ScrollView>
                     )}
@@ -67,10 +113,20 @@ export class ErrorBoundary extends Component<Props, State> {
                     <TouchableOpacity
                         activeOpacity={0.7}
                         onPress={this.handleRetry}
-                        className="h-12 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white px-8 shadow-sm"
+                        style={{
+                            height: 48,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            backgroundColor: '#FFFFFF',
+                            paddingHorizontal: 32,
+                        }}
                     >
                         <Feather name="refresh-cw" size={16} color="#0F172A" style={{ marginRight: 8 }} />
-                        <Text className="text-sm font-bold tracking-wide text-slate-900">Tentar Novamente</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>Tentar Novamente</Text>
                     </TouchableOpacity>
                 </View>
             )

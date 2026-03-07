@@ -1,6 +1,12 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
-import { Children, cloneElement, useCallback, useEffect, useMemo, useState } from 'react'
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+    RefreshControl,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchHistoricoData, type HistoricoData } from '@/lib/appData'
@@ -28,10 +34,11 @@ function buildCalendarWeeks(monthDate: Date) {
     for (let i = 0; i < days.length; i += 7) {
         weeks.push(days.slice(i, i + 7))
     }
+
     return weeks
 }
 
-function emptyHistorico(monthLabel: string): HistoricoData {
+function buildEmptyHistorico(monthLabel: string): HistoricoData {
     return {
         mesLabel: monthLabel,
         resumo: {
@@ -44,6 +51,16 @@ function emptyHistorico(monthLabel: string): HistoricoData {
     }
 }
 
+function createShadow(color: string, opacity: number, radius: number, elevation: number) {
+    return {
+        shadowColor: color,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: opacity,
+        shadowRadius: radius,
+        elevation,
+    }
+}
+
 export default function HistoricoScreen() {
     const { aluno } = useAuth()
     const monthOptions = useMemo(buildMonthOptions, [])
@@ -51,7 +68,12 @@ export default function HistoricoScreen() {
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
     const [historico, setHistorico] = useState<HistoricoData>(
-        emptyHistorico(monthOptions[monthOptions.length - 1].toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }))
+        buildEmptyHistorico(
+            monthOptions[monthOptions.length - 1].toLocaleDateString('pt-BR', {
+                month: 'short',
+                year: 'numeric',
+            })
+        )
     )
     const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null)
 
@@ -63,11 +85,11 @@ export default function HistoricoScreen() {
             setLoading(false)
             return
         }
+
         try {
             const yearStr = selectedMonth.getFullYear()
             const monthStr = (selectedMonth.getMonth() + 1).toString().padStart(2, '0')
             const filterStr = `${yearStr}-${monthStr}`
-
             const data = await fetchHistoricoData(aluno.id, filterStr)
             setHistorico(data)
         } catch (error) {
@@ -78,7 +100,7 @@ export default function HistoricoScreen() {
     }, [aluno?.id, selectedMonth])
 
     useEffect(() => {
-        loadData()
+        void loadData()
     }, [loadData])
 
     const onRefresh = useCallback(async () => {
@@ -103,13 +125,37 @@ export default function HistoricoScreen() {
 
     const today = new Date()
     const isCurrentMonth =
-        selectedMonth.getMonth() === today.getMonth() && selectedMonth.getFullYear() === today.getFullYear()
+        selectedMonth.getMonth() === today.getMonth() &&
+        selectedMonth.getFullYear() === today.getFullYear()
 
     return (
-        <View className="flex-1 bg-[#FDFDFD]">
-            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-8 pt-12">
-                <Text className="mb-1 text-sm font-bold uppercase tracking-widest text-slate-500">Estatisticas</Text>
-                <Text className="text-4xl font-black tracking-tight text-slate-900">Historico</Text>
+        <View style={{ flex: 1, backgroundColor: '#FDFDFD' }}>
+            <View
+                style={{
+                    zIndex: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E2E8F0',
+                    backgroundColor: '#FFFFFF',
+                    paddingHorizontal: 24,
+                    paddingTop: 48,
+                    paddingBottom: 24,
+                }}
+            >
+                <Text
+                    style={{
+                        marginBottom: 4,
+                        fontSize: 12,
+                        fontWeight: '800',
+                        textTransform: 'uppercase',
+                        letterSpacing: 2,
+                        color: '#64748B',
+                    }}
+                >
+                    Estatisticas
+                </Text>
+                <Text style={{ fontSize: 36, fontWeight: '900', letterSpacing: -1, color: '#0F172A' }}>
+                    Historico
+                </Text>
             </View>
 
             <ScrollView
@@ -117,207 +163,453 @@ export default function HistoricoScreen() {
                 contentContainerStyle={{ paddingBottom: 120 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-                <View className="px-6 pt-8">
-                    <View className="mb-10 flex-row justify-between gap-x-4">
-                        <View className="flex-1 items-center justify-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50">
-                            <View className="mb-3 h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                <View style={{ paddingHorizontal: 24, paddingTop: 24 }}>
+                    <View
+                        style={{
+                            marginBottom: 28,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            gap: 12,
+                        }}
+                    >
+                        <View
+                            style={{
+                                flex: 1,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 24,
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                backgroundColor: '#FFFFFF',
+                                paddingVertical: 20,
+                                paddingHorizontal: 12,
+                                ...createShadow('#CBD5E1', 0.18, 12, 3),
+                            }}
+                        >
+                            <View
+                                style={{
+                                    marginBottom: 12,
+                                    height: 32,
+                                    width: 32,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 16,
+                                    backgroundColor: '#F8FAFC',
+                                }}
+                            >
                                 <Feather name="calendar" size={14} color="#64748B" />
                             </View>
-                            <Text className="text-3xl font-black tracking-tighter text-[#CC0000]">
+                            <Text style={{ fontSize: 30, fontWeight: '900', color: '#CC0000' }}>
                                 {historico.resumo.mes}
                             </Text>
-                            <Text className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            <Text
+                                style={{
+                                    marginTop: 6,
+                                    fontSize: 10,
+                                    fontWeight: '800',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 1.6,
+                                    color: '#94A3B8',
+                                }}
+                            >
                                 Neste mes
                             </Text>
                         </View>
 
-                        <View className="relative flex-[1.2] items-center justify-center overflow-hidden rounded-3xl bg-slate-900 p-5 shadow-lg shadow-slate-900/20">
-                            <View className="absolute -right-4 -top-4 opacity-10">
+                        <View
+                            style={{
+                                flex: 1.2,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                                borderRadius: 24,
+                                backgroundColor: '#0F172A',
+                                paddingVertical: 20,
+                                paddingHorizontal: 12,
+                                ...createShadow('#0F172A', 0.25, 16, 6),
+                            }}
+                        >
+                            <View style={{ position: 'absolute', right: -16, top: -12, opacity: 0.12 }}>
                                 <FontAwesome5 name="fire" size={60} color="#FFFFFF" />
                             </View>
-                            <View className="mb-3 h-8 w-8 items-center justify-center rounded-full bg-white/10">
+                            <View
+                                style={{
+                                    marginBottom: 12,
+                                    height: 32,
+                                    width: 32,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 16,
+                                    backgroundColor: 'rgba(255,255,255,0.12)',
+                                }}
+                            >
                                 <FontAwesome5 name="fire" size={14} color="#FFFFFF" />
                             </View>
-                            <Text className="text-3xl font-black tracking-tighter text-white">
+                            <Text style={{ fontSize: 30, fontWeight: '900', color: '#FFFFFF' }}>
                                 {historico.resumo.sequencia}
                             </Text>
-                            <Text className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-300">
+                            <Text
+                                style={{
+                                    marginTop: 6,
+                                    fontSize: 10,
+                                    fontWeight: '800',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 1.6,
+                                    color: '#CBD5E1',
+                                }}
+                            >
                                 Sequencia
                             </Text>
                         </View>
 
-                        <View className="flex-1 items-center justify-center rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50">
-                            <View className="mb-3 h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                        <View
+                            style={{
+                                flex: 1,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 24,
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                backgroundColor: '#FFFFFF',
+                                paddingVertical: 20,
+                                paddingHorizontal: 12,
+                                ...createShadow('#CBD5E1', 0.18, 12, 3),
+                            }}
+                        >
+                            <View
+                                style={{
+                                    marginBottom: 12,
+                                    height: 32,
+                                    width: 32,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 16,
+                                    backgroundColor: '#F8FAFC',
+                                }}
+                            >
                                 <Feather name="activity" size={14} color="#64748B" />
                             </View>
-                            <Text className="text-3xl font-black tracking-tighter text-[#CC0000]">
+                            <Text style={{ fontSize: 30, fontWeight: '900', color: '#CC0000' }}>
                                 {historico.resumo.total}
                             </Text>
-                            <Text className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            <Text
+                                style={{
+                                    marginTop: 6,
+                                    fontSize: 10,
+                                    fontWeight: '800',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 1.6,
+                                    color: '#94A3B8',
+                                }}
+                            >
                                 Total
                             </Text>
                         </View>
                     </View>
 
-                    <View className="rounded-t-2xl border-x border-t border-slate-100 bg-white p-2 shadow-sm shadow-slate-200/30">
-                        <View className="flex-row items-center justify-between">
+                    <View
+                        style={{
+                            borderTopLeftRadius: 20,
+                            borderTopRightRadius: 20,
+                            borderWidth: 1,
+                            borderBottomWidth: 0,
+                            borderColor: '#E2E8F0',
+                            backgroundColor: '#FFFFFF',
+                            padding: 8,
+                            ...createShadow('#CBD5E1', 0.12, 8, 2),
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <TouchableOpacity
-                                activeOpacity={0.6}
+                                activeOpacity={0.7}
                                 disabled={mesAtualIndex === 0}
                                 onPress={handlePrevMonth}
-                                className={`h-12 w-12 items-center justify-center rounded-xl bg-slate-50 ${mesAtualIndex === 0 ? 'opacity-40' : ''
-                                    }`}
+                                style={{
+                                    height: 48,
+                                    width: 48,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 14,
+                                    backgroundColor: '#F8FAFC',
+                                    opacity: mesAtualIndex === 0 ? 0.4 : 1,
+                                }}
                             >
                                 <Feather name="chevron-left" size={20} color="#64748B" />
                             </TouchableOpacity>
 
-                            <Text className="text-lg font-black uppercase tracking-tight text-slate-900">
+                            <Text
+                                style={{
+                                    fontSize: 18,
+                                    fontWeight: '900',
+                                    textTransform: 'uppercase',
+                                    color: '#0F172A',
+                                }}
+                            >
                                 {historico.mesLabel}
                             </Text>
 
                             <TouchableOpacity
-                                activeOpacity={0.6}
+                                activeOpacity={0.7}
                                 disabled={mesAtualIndex === monthOptions.length - 1}
                                 onPress={handleNextMonth}
-                                className={`h-12 w-12 items-center justify-center rounded-xl bg-slate-50 ${mesAtualIndex === monthOptions.length - 1 ? 'opacity-40' : ''
-                                    }`}
+                                style={{
+                                    height: 48,
+                                    width: 48,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 14,
+                                    backgroundColor: '#F8FAFC',
+                                    opacity: mesAtualIndex === monthOptions.length - 1 ? 0.4 : 1,
+                                }}
                             >
                                 <Feather name="chevron-right" size={20} color="#64748B" />
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    <View className="mb-10 overflow-hidden rounded-b-2xl border border-slate-100 bg-white shadow-sm shadow-slate-200/50">
-                        <View className="flex-row border-b border-slate-100 bg-slate-50">
-                            {Children.toArray(
-                                DAY_HEADERS.map((day) =>
-                                    cloneElement(
-                                        <View className="flex-1 items-center py-3">
-                                            <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                {day}
-                                            </Text>
-                                        </View>,
-                                        { key: day }
-                                    )
-                                )
-                            )}
+                    <View
+                        style={{
+                            marginBottom: 28,
+                            overflow: 'hidden',
+                            borderRadius: 20,
+                            borderTopLeftRadius: 0,
+                            borderTopRightRadius: 0,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            backgroundColor: '#FFFFFF',
+                            ...createShadow('#CBD5E1', 0.18, 12, 3),
+                        }}
+                    >
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                borderBottomWidth: 1,
+                                borderBottomColor: '#E2E8F0',
+                                backgroundColor: '#F8FAFC',
+                            }}
+                        >
+                            {DAY_HEADERS.map((day) => (
+                                <View key={day} style={{ flex: 1, alignItems: 'center', paddingVertical: 12 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 10,
+                                            fontWeight: '900',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: 1.5,
+                                            color: '#94A3B8',
+                                        }}
+                                    >
+                                        {day}
+                                    </Text>
+                                </View>
+                            ))}
                         </View>
 
-                        <View className="p-4 pb-6">
-                            {Children.toArray(
-                                weeks.map((semana, indexSemana) =>
-                                    cloneElement(
-                                        <View className="flex-row mb-3 last:mb-0">
-                                            {semana.map((dia, indexDia) => {
-                                                const hasPresenca = dia ? historico.diasComPresenca.includes(dia) : false
-                                                const isHoje = Boolean(dia && isCurrentMonth && dia === today.getDate())
+                        <View style={{ padding: 16, paddingBottom: 20 }}>
+                            {weeks.map((semana, indexSemana) => (
+                                <View key={`week-${indexSemana}`} style={{ flexDirection: 'row', marginBottom: 12 }}>
+                                    {semana.map((dia, indexDia) => {
+                                        const hasPresenca = dia ? historico.diasComPresenca.includes(dia) : false
+                                        const isHoje = Boolean(dia && isCurrentMonth && dia === today.getDate())
+                                        const isSelected = diaSelecionado === dia
 
-                                                const handleDayPress = () => {
-                                                    if (!dia) return
-                                                    setDiaSelecionado(dia)
-                                                }
-
-                                                return (
-                                                    <TouchableOpacity
-                                                        key={dia ?? `empty-${indexSemana}-${indexDia}`}
-                                                        className="relative flex-1 items-center justify-center px-1"
-                                                        disabled={!dia}
-                                                        activeOpacity={0.7}
-                                                        onPress={handleDayPress}
+                                        return (
+                                            <TouchableOpacity
+                                                key={dia ?? `empty-${indexSemana}-${indexDia}`}
+                                                disabled={!dia}
+                                                activeOpacity={0.75}
+                                                onPress={() => {
+                                                    if (dia) setDiaSelecionado(dia)
+                                                }}
+                                                style={{
+                                                    position: 'relative',
+                                                    flex: 1,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    paddingHorizontal: 4,
+                                                }}
+                                            >
+                                                {dia ? (
+                                                    <View
+                                                        style={{
+                                                            height: 40,
+                                                            width: 40,
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            borderRadius: 999,
+                                                            backgroundColor: isSelected
+                                                                ? '#CC0000'
+                                                                : hasPresenca
+                                                                  ? '#FEF2F2'
+                                                                  : '#FFFFFF',
+                                                            borderWidth: isSelected
+                                                                ? 0
+                                                                : isHoje && !hasPresenca
+                                                                  ? 2
+                                                                  : hasPresenca
+                                                                    ? 1
+                                                                    : 0,
+                                                            borderColor: isHoje && !hasPresenca ? '#0F172A' : '#FECACA',
+                                                        }}
                                                     >
-                                                        {dia && (
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 16,
+                                                                fontWeight: '700',
+                                                                color: isSelected
+                                                                    ? '#FFFFFF'
+                                                                    : hasPresenca
+                                                                      ? '#CC0000'
+                                                                      : isHoje
+                                                                        ? '#0F172A'
+                                                                        : '#475569',
+                                                            }}
+                                                        >
+                                                            {dia}
+                                                        </Text>
+                                                        {hasPresenca && !isSelected ? (
                                                             <View
-                                                                className={`items-center justify-center h-10 w-10 ${diaSelecionado === dia
-                                                                    ? ''
-                                                                    : isHoje && !hasPresenca
-                                                                        ? 'border-2 border-slate-900 bg-white'
-                                                                        : hasPresenca
-                                                                            ? 'border border-red-100 bg-red-50'
-                                                                            : 'bg-transparent'
-                                                                    }`}
                                                                 style={{
-                                                                    backgroundColor: diaSelecionado === dia ? '#CC0000' : undefined,
-                                                                    borderRadius: 9999
+                                                                    position: 'absolute',
+                                                                    bottom: 6,
+                                                                    height: 6,
+                                                                    width: 6,
+                                                                    borderRadius: 999,
+                                                                    backgroundColor: '#CC0000',
                                                                 }}
-                                                            >
-                                                                <Text
-                                                                    className={`text-base font-bold ${diaSelecionado === dia
-                                                                        ? ''
-                                                                        : isHoje && !hasPresenca
-                                                                            ? 'text-slate-900'
-                                                                            : hasPresenca
-                                                                                ? 'text-[#CC0000]'
-                                                                                : 'text-slate-600'
-                                                                        }`}
-                                                                    style={{
-                                                                        color: diaSelecionado === dia ? '#FFFFFF' : undefined
-                                                                    }}
-                                                                >
-                                                                    {dia}
-                                                                </Text>
-                                                                {hasPresenca && diaSelecionado !== dia && (
-                                                                    <View className="absolute bottom-2 h-1.5 w-1.5 rounded-full bg-[#CC0000]" />
-                                                                )}
-                                                            </View>
-                                                        )}
-                                                    </TouchableOpacity>
-                                                )
-                                            })}
-                                        </View>,
-                                        { key: `week-${indexSemana}` }
-                                    )
-                                )
-                            )}
+                                                            />
+                                                        ) : null}
+                                                    </View>
+                                                ) : null}
+                                            </TouchableOpacity>
+                                        )
+                                    })}
+                                </View>
+                            ))}
                         </View>
                     </View>
 
                     <View>
-                        <Text className="mb-6 text-xl font-bold tracking-tight text-slate-900">
-                            Aulas Concluidas
+                        <Text style={{ marginBottom: 20, fontSize: 22, fontWeight: '800', color: '#0F172A' }}>
+                            Aulas concluidas
                         </Text>
 
                         {loading ? (
-                            <View className="rounded-3xl border border-slate-100 bg-white p-6">
-                                <Text className="text-sm text-slate-500">Carregando historico...</Text>
+                            <View
+                                style={{
+                                    borderRadius: 24,
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0',
+                                    backgroundColor: '#FFFFFF',
+                                    padding: 24,
+                                }}
+                            >
+                                <Text style={{ fontSize: 14, color: '#64748B' }}>Carregando historico...</Text>
                             </View>
                         ) : historico.presencasLista.length > 0 ? (
-                            <View className="rounded-3xl border border-slate-100 bg-white p-2 shadow-sm shadow-slate-200/50">
-                                {Children.toArray(
-                                    historico.presencasLista.map((presenca, index) =>
-                                        cloneElement(
+                            <View
+                                style={{
+                                    borderRadius: 24,
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0',
+                                    backgroundColor: '#FFFFFF',
+                                    padding: 8,
+                                    ...createShadow('#CBD5E1', 0.18, 12, 3),
+                                }}
+                            >
+                                {historico.presencasLista.map((presenca, index) => (
+                                    <View
+                                        key={presenca.id}
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            padding: 16,
+                                            borderBottomWidth:
+                                                index !== historico.presencasLista.length - 1 ? 1 : 0,
+                                            borderBottomColor: '#F1F5F9',
+                                        }}
+                                    >
                                         <View
-                                            className={`flex-row items-center p-4 ${index !== historico.presencasLista.length - 1
-                                                ? 'border-b border-slate-50'
-                                                : ''
-                                                }`}
+                                            style={{
+                                                marginRight: 20,
+                                                height: 48,
+                                                width: 48,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                borderRadius: 24,
+                                                borderWidth: 1,
+                                                borderColor: '#BBF7D0',
+                                                backgroundColor: '#ECFDF5',
+                                            }}
                                         >
-                                            <View className="mr-5 h-12 w-12 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50">
-                                                <Feather name="check" size={18} color="#10B981" />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">
-                                                    {presenca.aula}
+                                            <Feather name="check" size={18} color="#10B981" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text
+                                                style={{
+                                                    marginBottom: 4,
+                                                    fontSize: 18,
+                                                    fontWeight: '800',
+                                                    color: '#0F172A',
+                                                }}
+                                            >
+                                                {presenca.aula}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Feather name="clock" size={12} color="#94A3B8" />
+                                                <Text
+                                                    style={{
+                                                        marginLeft: 8,
+                                                        fontSize: 12,
+                                                        fontWeight: '800',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: 1.2,
+                                                        color: '#64748B',
+                                                    }}
+                                                >
+                                                    {presenca.data}
                                                 </Text>
-                                                <View className="flex-row items-center">
-                                                    <Feather name="clock" size={12} color="#94A3B8" />
-                                                    <Text className="ml-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-                                                        {presenca.data}
-                                                    </Text>
-                                                </View>
                                             </View>
                                         </View>
-                                        ,
-                                        { key: presenca.id }
-                                        )
-                                    )
-                                )}
+                                    </View>
+                                ))}
                             </View>
                         ) : (
-                            <View className="items-center justify-center rounded-3xl border border-dashed border-slate-100 bg-white px-8 py-16">
-                                <View className="mb-6 h-20 w-20 items-center justify-center rounded-full bg-slate-50">
+                            <View
+                                style={{
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 24,
+                                    borderWidth: 1,
+                                    borderStyle: 'dashed',
+                                    borderColor: '#E2E8F0',
+                                    backgroundColor: '#FFFFFF',
+                                    paddingHorizontal: 32,
+                                    paddingVertical: 56,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        marginBottom: 24,
+                                        height: 80,
+                                        width: 80,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderRadius: 40,
+                                        backgroundColor: '#F8FAFC',
+                                    }}
+                                >
                                     <Feather name="inbox" size={32} color="#CBD5E1" />
                                 </View>
-                                <Text className="text-center text-lg font-bold leading-relaxed tracking-tight text-slate-400">
+                                <Text
+                                    style={{
+                                        textAlign: 'center',
+                                        fontSize: 18,
+                                        fontWeight: '800',
+                                        lineHeight: 26,
+                                        color: '#94A3B8',
+                                    }}
+                                >
                                     Nenhuma presenca neste mes
                                 </Text>
                             </View>

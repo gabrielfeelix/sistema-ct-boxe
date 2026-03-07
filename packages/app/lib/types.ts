@@ -22,8 +22,19 @@ export interface ContractBannerStatus {
 export interface HomeStory {
     id: string
     nome: string
+    capa_url: string | null
+    tem_novo: boolean
+    total_videos: number
+    created_at?: string | null
+    videos: HomeStoryVideo[]
+}
+
+export interface HomeStoryVideo {
+    id: string
+    titulo: string
+    descricao?: string | null
+    video_url: string
     thumbnail: string | null
-    assistido: boolean
     duracao: number
     created_at?: string | null
 }
@@ -33,11 +44,25 @@ export interface HomeNotification {
     tipo: string
     titulo: string
     subtitulo: string
+    mensagem?: string | null
     horario: string
     lida: boolean
     acao?: string | null
     link?: string | null
+    actionLabel?: string | null
+    created_at?: string | null
+    icone?: string | null
+    audiencia?: string | null
 }
+
+export type AulaConfirmationState =
+    | 'available'
+    | 'booked'
+    | 'checked_in'
+    | 'too_early'
+    | 'too_late'
+    | 'full'
+    | 'past'
 
 export interface AppAula {
     id: string
@@ -52,6 +77,11 @@ export interface AppAula {
     descricao?: string | null
     agendado?: boolean
     presente?: boolean
+    confirmationState?: AulaConfirmationState
+    presenceActionEnabled?: boolean
+    presenceStatusLabel?: string
+    presenceActionLabel?: string
+    presenceRestrictionMessage?: string | null
 }
 
 export interface FeedComment {
@@ -81,6 +111,8 @@ export interface EventoApp {
     data_evento: string
     local?: string | null
     icone?: string | null
+    imagem_url?: string | null
+    valor?: number | null
     destaque: boolean
     ativo: boolean
     confirmados: number
@@ -96,4 +128,3 @@ export interface DocumentoAluno {
     validade?: string | null
     texto?: string | null
 }
-

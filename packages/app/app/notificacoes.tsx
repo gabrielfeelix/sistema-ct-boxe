@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useState, Fragment } from 'react'
 import { Alert, FlatList, Linking, RefreshControl, Text, TouchableOpacity, View } from 'react-native'
 
+import NotificationIcon, { resolveNotificationIcon } from '@/components/NotificationIcon'
 import { NotificationSkeleton } from '@/components/SkeletonLoader'
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchNotificacoes, markAllNotificacoesLidas, markNotificacaoLida } from '@/lib/appData'
@@ -40,21 +41,22 @@ export default function NotificacoesScreen() {
         setRefreshing(false)
     }, [loadData])
 
-    const getIconConfig = (tipo: string) => {
-        switch (tipo) {
-            case 'aula':
-                return { iconName: 'zap', iconColor: '#CC0000', bg: 'bg-red-100' }
-            case 'pagamento':
-                return { iconName: 'dollar-sign', iconColor: '#D97706', bg: 'bg-amber-100' }
-            case 'ct':
-                return { iconName: 'info', iconColor: '#2563EB', bg: 'bg-blue-100' }
-            case 'video':
-                return { iconName: 'youtube', iconColor: '#DC2626', bg: 'bg-red-100' }
-            case 'evento':
-                return { iconName: 'calendar', iconColor: '#2563EB', bg: 'bg-blue-100' }
-            default:
-                return { iconName: 'bell', iconColor: '#64748B', bg: 'bg-slate-100' }
-        }
+    const getIconConfig = (item: HomeNotification) => {
+        const resolved = resolveNotificationIcon(item.icone, item.tipo)
+        const bg =
+            resolved.tone.backgroundColor === '#FEE2E2'
+                ? 'bg-red-100'
+                : resolved.tone.backgroundColor === '#DBEAFE'
+                  ? 'bg-blue-100'
+                  : resolved.tone.backgroundColor === '#EDE9FE'
+                    ? 'bg-violet-100'
+                    : resolved.tone.backgroundColor === '#CCFBF1'
+                      ? 'bg-teal-100'
+                      : resolved.tone.backgroundColor === '#FEF3C7'
+                        ? 'bg-amber-100'
+                        : 'bg-slate-100'
+
+        return { iconName: resolved.icon, iconColor: resolved.tone.color, bg }
     }
 
     const handleAction = async (id: string, acao?: string | null, link?: string | null) => {
@@ -156,7 +158,7 @@ export default function NotificacoesScreen() {
                     )
                 }
                 renderItem={({ item }) => {
-                    const config = getIconConfig(item.tipo)
+                    const config = getIconConfig(item)
                     return (
                         <View className="mb-3">
                             <TouchableOpacity
@@ -174,7 +176,7 @@ export default function NotificacoesScreen() {
                                 <View
                                     className={`mr-4 mt-1 h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-white shadow-sm ${config.bg}`}
                                 >
-                                    <Feather name={config.iconName as never} size={18} color={config.iconColor} />
+                                    <NotificationIcon icon={config.iconName} size={18} color={config.iconColor} />
                                 </View>
 
                                 <View className="flex-1 justify-center">
@@ -207,4 +209,3 @@ export default function NotificacoesScreen() {
         </View>
     )
 }
-

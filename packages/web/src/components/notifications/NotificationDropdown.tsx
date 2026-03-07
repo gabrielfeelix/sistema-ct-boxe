@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, CheckCircle2, Mail, CalendarClock, ArrowRight, Smartphone, AlertCircle, ShoppingCart } from 'lucide-react'
+import { Bell, CalendarClock, ArrowRight, Smartphone, AlertCircle, ShoppingCart, PartyPopper, Instagram, Youtube, Heart, MessageCircle, UserCheck, Megaphone } from 'lucide-react'
 import Link from 'next/link'
 import { useNotificacoes, type NotificacaoItem } from '@/hooks/useNotificacoes'
 import { useProfessoresSelect } from '@/hooks/useProfessores'
@@ -12,6 +12,19 @@ const TIPO_UI: Record<string, { icon: React.ElementType; color: string; bg: stri
     ct: { icon: Bell, color: 'text-[#CC0000]', bg: 'bg-red-50' },
     sistema: { icon: AlertCircle, color: 'text-amber-500', bg: 'bg-amber-50' },
     video: { icon: Smartphone, color: 'text-blue-500', bg: 'bg-blue-50' },
+    evento: { icon: PartyPopper, color: 'text-violet-500', bg: 'bg-violet-50' },
+}
+
+const ICONE_UI: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+    instagram: { icon: Instagram, color: 'text-pink-500', bg: 'bg-pink-50' },
+    youtube: { icon: Youtube, color: 'text-red-500', bg: 'bg-red-50' },
+    'credit-card': { icon: ShoppingCart, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    'calendar-days': { icon: CalendarClock, color: 'text-orange-500', bg: 'bg-orange-50' },
+    'message-square': { icon: MessageCircle, color: 'text-sky-500', bg: 'bg-sky-50' },
+    heart: { icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50' },
+    'user-check': { icon: UserCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
+    'party-popper': { icon: PartyPopper, color: 'text-violet-500', bg: 'bg-violet-50' },
+    megaphone: { icon: Megaphone, color: 'text-fuchsia-600', bg: 'bg-fuchsia-50' },
 }
 
 function tempoRelativo(valor: string) {
@@ -104,7 +117,10 @@ export function NotificationDropdown() {
                         ) : (
                             <div className="divide-y divide-gray-50">
                                 {notificacoes.slice(0, 8).map((notification) => {
-                                    const ui = TIPO_UI[notification.tipo] || TIPO_UI.ct
+                                    const ui =
+                                        (notification.icone ? ICONE_UI[notification.icone] : null) ||
+                                        TIPO_UI[notification.tipo] ||
+                                        TIPO_UI.ct
                                     const Icon = ui.icon
                                     return (
                                         <div
