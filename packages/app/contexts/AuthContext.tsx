@@ -136,17 +136,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         bootstrap()
 
-        return () => {
-            active = false
-            clearTimeout(fallbackTimeout)
-            subscription.unsubscribe()
-        }
-
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
             await resolveSession(nextSession)
         })
+
+        return () => {
+            active = false
+            clearTimeout(fallbackTimeout)
+            subscription.unsubscribe()
+        }
     }, [])
 
     const signIn = useCallback(async (email: string, password: string): Promise<SignInResult> => {
