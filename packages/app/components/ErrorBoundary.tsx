@@ -1,5 +1,5 @@
 import React, { Component, ReactNode } from 'react'
-import { Text, TouchableOpacity, View } from 'react-native'
+import { Text, TouchableOpacity, View, ScrollView } from 'react-native'
 import { Feather } from '@expo/vector-icons'
 
 interface Props {
@@ -10,24 +10,33 @@ interface Props {
 interface State {
     hasError: boolean
     error: Error | null
+    errorInfo: React.ErrorInfo | null
+}
+
+// Global error handler para promise rejections não tratadas
+if (typeof window !== 'undefined') {
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('[ErrorBoundary] Unhandled Promise Rejection:', event.reason)
+    })
 }
 
 export class ErrorBoundary extends Component<Props, State> {
     constructor(props: Props) {
         super(props)
-        this.state = { hasError: false, error: null }
+        this.state = { hasError: false, error: null, errorInfo: null }
     }
 
-    static getDerivedStateFromError(error: Error): State {
+    static getDerivedStateFromError(error: Error): Partial<State> {
         return { hasError: true, error }
     }
 
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
         console.error('[ErrorBoundary] Caught error:', error, errorInfo)
+        this.setState({ errorInfo })
     }
 
     handleRetry = () => {
-        this.setState({ hasError: false, error: null })
+        this.setState({ hasError: false, error: null, errorInfo: null })
     }
 
     render() {
@@ -35,6 +44,8 @@ export class ErrorBoundary extends Component<Props, State> {
             if (this.props.fallback) {
                 return this.props.fallback(this.state.error!, this.handleRetry)
             }
+
+            const isDev = __DEV__
 
             return (
                 <View className="flex-1 items-center justify-center bg-[#FDFDFD] px-6">
@@ -45,6 +56,21 @@ export class ErrorBoundary extends Component<Props, State> {
                     <Text className="mb-8 max-w-sm text-center text-sm font-medium leading-relaxed text-slate-500">
                         Algo deu errado. Tente novamente ou volte mais tarde.
                     </Text>
+
+                    {/* Mostrar detalhes do erro em desenvolvimento */}
+                    {isDev && this.state.error && (
+                        <ScrollView className="mb-6 w-full max-h-40 rounded-xl bg-slate-50 p-4">
+                            <Text className="text-xs font-mono text-red-600">
+                                {this.state.error.toString()}
+                            </Text>
+                            {this.state.error.stack && (
+                                <Text className="mt-2 text-[10px] font-mono text-slate-600">
+                                    {this.state.error.stack}
+                                </Text>
+                            )}
+                        </ScrollView>
+                    )}
+
                     <TouchableOpacity
                         activeOpacity={0.7}
                         onPress={this.handleRetry}
