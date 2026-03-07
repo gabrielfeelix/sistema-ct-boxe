@@ -24,12 +24,10 @@ export function GluestackUIProvider({
 
   // Fallback to mode if colorScheme is null/undefined
   const activeScheme = (colorScheme || mode) as 'light' | 'dark';
-  const schemeStyles = config[activeScheme] || config.light;
 
   return (
     <View
       style={[
-        schemeStyles,
         { flex: 1, height: '100%', width: '100%' },
         props.style,
       ]}
