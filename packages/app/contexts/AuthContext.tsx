@@ -25,9 +25,24 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
+// Timeout helper
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs)
+        ),
+    ])
+}
+
 async function fetchAlunoProfile(user: User): Promise<AlunoProfile | null> {
     try {
-        const byId = await supabase.from('alunos').select('*').eq('id', user.id).maybeSingle()
+        // Timeout de 10 segundos para evitar travamento
+        const byId = await withTimeout(
+            supabase.from('alunos').select('*').eq('id', user.id).maybeSingle(),
+            10000
+        )
+
         if (byId.error) {
             console.error('[Auth] Falha ao buscar aluno por id:', byId.error.message)
         }
@@ -35,11 +50,10 @@ async function fetchAlunoProfile(user: User): Promise<AlunoProfile | null> {
 
         if (!user.email) return null
 
-        const byEmail = await supabase
-            .from('alunos')
-            .select('*')
-            .eq('email', user.email.toLowerCase())
-            .maybeSingle()
+        const byEmail = await withTimeout(
+            supabase.from('alunos').select('*').eq('email', user.email.toLowerCase()).maybeSingle(),
+            10000
+        )
 
         if (byEmail.error) {
             console.error('[Auth] Falha ao buscar aluno por email:', byEmail.error.message)
@@ -95,32 +109,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         async function bootstrap() {
             try {
+                // Timeout de 15s para evitar travamento em rede ruim
                 const {
                     data: { session: currentSession },
-                } = await supabase.auth.getSession()
+                } = await withTimeout(supabase.auth.getSession(), 15000)
+
                 if (!active) return
                 await resolveSession(currentSession)
             } catch (error) {
                 if (!active) return
                 console.error('[Auth] Erro no bootstrap da sessão:', error)
+                // CRÍTICO: Sempre finalizar loading mesmo em erro
                 setSession(null)
                 setAluno(null)
                 setLoading(false)
             }
         }
 
+        // Timeout de fallback caso tudo falhe
+        const fallbackTimeout = setTimeout(() => {
+            if (active && loading) {
+                console.warn('[Auth] Timeout de fallback - forçando loading=false após 20s')
+                setLoading(false)
+            }
+        }, 20000)
+
         bootstrap()
+
+        return () => {
+            active = false
+            clearTimeout(fallbackTimeout)
+            subscription.unsubscribe()
+        }
 
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
             await resolveSession(nextSession)
         })
-
-        return () => {
-            active = false
-            subscription.unsubscribe()
-        }
     }, [])
 
     const signIn = useCallback(async (email: string, password: string): Promise<SignInResult> => {
