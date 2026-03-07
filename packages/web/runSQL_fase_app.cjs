@@ -277,6 +277,29 @@ SELECT
 FROM contratos c
 LEFT JOIN alunos a ON a.id = c.aluno_id
 LEFT JOIN planos p ON p.id = c.plano_id;
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true) 
+ON CONFLICT (id) DO NOTHING;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage' AND policyname = 'Public Access'
+    ) THEN
+        CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'avatars' );
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage' AND policyname = 'Auth Insert'
+    ) THEN
+        CREATE POLICY "Auth Insert" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'avatars' AND auth.role() = 'authenticated' );
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage' AND policyname = 'Auth Update'
+    ) THEN
+        CREATE POLICY "Auth Update" ON storage.objects FOR UPDATE USING ( bucket_id = 'avatars' AND auth.uid() = owner );
+    END IF;
+END
+$$;
 
 GRANT ALL ON notificacoes, eventos, evento_confirmacoes, post_comentarios, post_curtidas, aluno_documentos TO anon, authenticated;
 GRANT SELECT ON contratos_com_status TO anon, authenticated;

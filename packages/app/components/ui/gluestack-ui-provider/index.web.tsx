@@ -9,6 +9,7 @@ import { script } from './script';
 export type ModeType = 'light' | 'dark' | 'system';
 
 const variableStyleTagId = 'nativewind-style';
+const ScriptTag = 'script' as React.ElementType;
 const createStyle = (styleTagId: string) => {
   const style = document.createElement('style');
   style.id = styleTagId;
@@ -82,7 +83,7 @@ export function GluestackUIProvider({
 
   return (
     <>
-      <script
+      <ScriptTag
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: `(${script.toString()})('${mode}')`,

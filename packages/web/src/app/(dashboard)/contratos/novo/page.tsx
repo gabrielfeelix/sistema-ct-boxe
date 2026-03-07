@@ -90,6 +90,12 @@ function NovoContratoForm() {
 
         setSaving(true)
         try {
+            // Garante que o aluno tenha apenas 1 contrato válido, cancelando os anteriores
+            await supabase
+                .from('contratos')
+                .update({ status: 'cancelado' })
+                .eq('aluno_id', alunoSelecionado.id)
+                .neq('status', 'cancelado')
             const payload = {
                 aluno_id: alunoSelecionado.id,
                 plano_id: planoSelecionado.id,
@@ -264,8 +270,8 @@ function NovoContratoForm() {
                                     type="button"
                                     onClick={() => setPlanoSelecionado(plano)}
                                     className={`rounded-xl border p-4 text-left transition-colors ${planoSelecionado?.id === plano.id
-                                            ? 'border-[#CC0000] bg-red-50/40'
-                                            : 'border-gray-200 bg-white hover:border-gray-300'
+                                        ? 'border-[#CC0000] bg-red-50/40'
+                                        : 'border-gray-200 bg-white hover:border-gray-300'
                                         }`}
                                 >
                                     <p className="text-sm font-bold text-gray-900">{plano.nome}</p>

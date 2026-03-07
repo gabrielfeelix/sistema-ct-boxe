@@ -1,7 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 
 import { Alert } from 'react-native'
-import { daysUntil, getInitials, monthLabel, toBRDate, toBRDateTime, toBRTime } from '@/lib/formatters'
+import { daysUntil, getInitials, monthLabel, toBRDate, toBRDateTime, toBRTime, toISODateLocal } from '@/lib/formatters'
 import { supabase } from './supabase'
 import type {
     AlunoProfile,
@@ -119,19 +119,92 @@ function mapAula(row: Record<string, unknown>, vagasOcupadas = 0): AppAula {
 }
 
 function getTodayISO() {
-    return new Date().toISOString().slice(0, 10)
+    return toISODateLocal()
 }
 
 function getTomorrowISO() {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow.toISOString().slice(0, 10)
+    return toISODateLocal(tomorrow)
 }
 
 function horaToMinutes(hora: string) {
     if (!hora || !hora.includes(':')) return 0
     const [h, m] = hora.split(':').map(Number)
     return (h || 0) * 60 + (m || 0)
+}
+
+const COUNTED_PRESENCA_STATUSES = ['agendado', 'presente', 'confirmado']
+const PRESENCA_PRIORITY: Record<string, number> = {
+    cancelada: 0,
+    falta: 1,
+    agendado: 2,
+    confirmado: 2,
+    presente: 3,
+}
+
+type PresencaRow = {
+    aula_id: string
+    aluno_id: string
+    status: string
+    updated_at?: string | null
+    created_at?: string | null
+}
+
+function presenceTimestampMs(presenca: PresencaRow) {
+    const raw = presenca.updated_at ?? presenca.created_at
+    if (!raw) return 0
+    const parsed = Date.parse(raw)
+    return Number.isFinite(parsed) ? parsed : 0
+}
+
+function buildPresenceMaps(presencasRows: PresencaRow[], alunoId: string) {
+    const latestByAulaAluno: Record<string, PresencaRow> = {}
+
+    presencasRows.forEach((presenca) => {
+        const key = `${presenca.aula_id}::${presenca.aluno_id}`
+        const current = latestByAulaAluno[key]
+        if (!current) {
+            latestByAulaAluno[key] = presenca
+            return
+        }
+
+        const currentTs = presenceTimestampMs(current)
+        const nextTs = presenceTimestampMs(presenca)
+        if (nextTs > currentTs) {
+            latestByAulaAluno[key] = presenca
+            return
+        }
+
+        if (nextTs === currentTs) {
+            const currentPriority = PRESENCA_PRIORITY[current.status] ?? -1
+            const nextPriority = PRESENCA_PRIORITY[presenca.status] ?? -1
+            if (nextPriority >= currentPriority) {
+                latestByAulaAluno[key] = presenca
+            }
+        }
+    })
+
+    const ocupacaoByAula: Record<string, number> = {}
+    const userStatusByAula: Record<string, string> = {}
+
+    Object.entries(latestByAulaAluno).forEach(([key, presenca]) => {
+        const status = presenca.status
+        const [aulaId, rowAlunoId] = key.split('::')
+        if (COUNTED_PRESENCA_STATUSES.includes(status)) {
+            ocupacaoByAula[aulaId] = (ocupacaoByAula[aulaId] ?? 0) + 1
+        }
+        if (rowAlunoId === alunoId) {
+            userStatusByAula[aulaId] = status
+        }
+    })
+
+    const statusByAulaAluno: Record<string, string> = {}
+    Object.entries(latestByAulaAluno).forEach(([key, presenca]) => {
+        statusByAulaAluno[key] = presenca.status
+    })
+
+    return { ocupacaoByAula, userStatusByAula, statusByAulaAluno }
 }
 
 async function fetchAulasWithPresence(alunoId: string, dateISO: string) {
@@ -142,6 +215,11 @@ async function fetchAulasWithPresence(alunoId: string, dateISO: string) {
         .neq('status', 'cancelada')
         .order('hora_inicio', { ascending: true })
 
+    if (aulasQuery.error) {
+        console.error('[Aulas] Erro ao buscar aulas:', aulasQuery.error.message)
+        return { aulas: [] as AppAula[], userStatusByAula: {} as Record<string, string> }
+    }
+
     const aulasRows = (aulasQuery.data as Record<string, unknown>[]) ?? []
     const aulaIds = aulasRows.map((aula) => String(aula.id))
 
@@ -151,24 +229,16 @@ async function fetchAulasWithPresence(alunoId: string, dateISO: string) {
 
     const presencasQuery = await supabase
         .from('presencas')
-        .select('aula_id, aluno_id, status')
+        .select('aula_id, aluno_id, status, updated_at, created_at')
         .in('aula_id', aulaIds)
 
-    const presencasRows =
-        (presencasQuery.data as Array<{ aula_id: string; aluno_id: string; status: string }>) ?? []
+    if (presencasQuery.error) {
+        console.error('[Aulas] Erro ao buscar presencas:', presencasQuery.error.message)
+    }
 
-    const ocupacaoByAula: Record<string, number> = {}
-    const userStatusByAula: Record<string, string> = {}
+    const presencasRows = (presencasQuery.data as PresencaRow[]) ?? []
 
-    presencasRows.forEach((presenca) => {
-        const isCounted = ['agendado', 'presente', 'confirmado'].includes(presenca.status)
-        if (isCounted) {
-            ocupacaoByAula[presenca.aula_id] = (ocupacaoByAula[presenca.aula_id] ?? 0) + 1
-        }
-        if (presenca.aluno_id === alunoId) {
-            userStatusByAula[presenca.aula_id] = presenca.status
-        }
-    })
+    const { ocupacaoByAula, userStatusByAula } = buildPresenceMaps(presencasRows, alunoId)
 
     const aulas = aulasRows.map((row) => {
         const id = String(row.id)
@@ -209,12 +279,12 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
     const now = new Date()
     const nowMinutes = now.getHours() * 60 + now.getMinutes()
 
-    // Buscar próximas aulas (futuras apenas, próximos 7 dias)
+    // Buscar proximas aulas (futuras apenas, proximos 7 dias)
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + 7)
-    const futureDateISO = futureDate.toISOString().slice(0, 10)
+    const futureDateISO = toISODateLocal(futureDate)
 
-    const [storiesRes, notifsRes, postsRes, aulasRes, presencasRes] = await Promise.all([
+    const [storiesRes, notifsRes, postsRes, aulasRes] = await Promise.allSettled([
         supabase.from('stories_ativos').select('*').order('created_at', { ascending: false }),
         supabase
             .from('notificacoes')
@@ -236,27 +306,68 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
             .order('data', { ascending: true })
             .order('hora_inicio', { ascending: true })
             .limit(15),
-        supabase
-            .from('presencas')
-            .select('aula_id, aluno_id, status')
-            .eq('aluno_id', alunoId),
     ])
 
-    // Processar aulas e presenças
-    const aulasRows = (aulasRes.data as Record<string, unknown>[]) ?? []
-    const presencasRows = (presencasRes.data as Array<{ aula_id: string; status: string }>) ?? []
+    const storiesRows =
+        storiesRes.status === 'fulfilled'
+            ? ((storiesRes.value.data as Record<string, unknown>[]) ?? [])
+            : []
+    if (storiesRes.status === 'fulfilled' && storiesRes.value.error) {
+        console.error('[Home] Erro ao buscar stories:', storiesRes.value.error.message)
+    }
+    if (storiesRes.status === 'rejected') {
+        console.error('[Home] Falha de rede ao buscar stories:', storiesRes.reason)
+    }
 
-    // Map de ocupação e status do usuário
-    const ocupacaoByAula: Record<string, number> = {}
-    const userStatusByAula: Record<string, string> = {}
+    const notificacoesNaoLidas =
+        notifsRes.status === 'fulfilled' ? (notifsRes.value.count ?? 0) : 0
+    if (notifsRes.status === 'fulfilled' && notifsRes.value.error) {
+        console.error('[Home] Erro ao buscar notificacoes:', notifsRes.value.error.message)
+    }
+    if (notifsRes.status === 'rejected') {
+        console.error('[Home] Falha de rede ao buscar notificacoes:', notifsRes.reason)
+    }
 
-    presencasRows.forEach((presenca) => {
-        const isCounted = ['agendado', 'presente', 'confirmado'].includes(presenca.status)
-        if (isCounted) {
-            ocupacaoByAula[presenca.aula_id] = (ocupacaoByAula[presenca.aula_id] ?? 0) + 1
+    const postsRows =
+        postsRes.status === 'fulfilled'
+            ? ((postsRes.value.data as Record<string, unknown>[]) ?? [])
+            : []
+    if (postsRes.status === 'fulfilled' && postsRes.value.error) {
+        console.error('[Home] Erro ao buscar avisos:', postsRes.value.error.message)
+    }
+    if (postsRes.status === 'rejected') {
+        console.error('[Home] Falha de rede ao buscar avisos:', postsRes.reason)
+    }
+
+    const aulasRows =
+        aulasRes.status === 'fulfilled'
+            ? ((aulasRes.value.data as Record<string, unknown>[]) ?? [])
+            : []
+    if (aulasRes.status === 'fulfilled' && aulasRes.value.error) {
+        console.error('[Home] Erro ao buscar aulas:', aulasRes.value.error.message)
+    }
+    if (aulasRes.status === 'rejected') {
+        console.error('[Home] Falha de rede ao buscar aulas:', aulasRes.reason)
+    }
+
+    const aulaIds = aulasRows.map((row) => String(row.id))
+    let presencasRows: PresencaRow[] = []
+
+    if (aulaIds.length > 0) {
+        const presencasRes = await supabase
+            .from('presencas')
+            .select('aula_id, aluno_id, status, updated_at, created_at')
+            .in('aula_id', aulaIds)
+
+        if (presencasRes.error) {
+            console.error('[Home] Erro ao buscar presencas:', presencasRes.error.message)
+        } else {
+            presencasRows = (presencasRes.data as PresencaRow[]) ?? []
         }
-        userStatusByAula[presenca.aula_id] = presenca.status
-    })
+    }
+
+    // Map de ocupacao e status do usuario
+    const { ocupacaoByAula, userStatusByAula } = buildPresenceMaps(presencasRows, alunoId)
 
     // Processar aulas e filtrar apenas futuras
     const allAulas = aulasRows.map((row) => {
@@ -278,11 +389,11 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
         return false
     })
 
-    // Pegar as próximas 10 aulas
+    // Pegar as proximas 10 aulas
     const aulasHoje = aulasFuturas.slice(0, 10)
     const proximaAula = aulasFuturas[0] ?? null
 
-    const stories = ((storiesRes.data as Record<string, unknown>[]) ?? []).map((row) => ({
+    const stories = storiesRows.map((row) => ({
         id: String(row.id),
         nome: String(row.autor ?? 'CT Boxe'),
         thumbnail: (row.imagem_url as string) ?? null,
@@ -291,7 +402,7 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
         created_at: (row.created_at as string) ?? null,
     })) as HomeStory[]
 
-    const avisos = ((postsRes.data as Record<string, unknown>[]) ?? []).map((row) => {
+    const avisos = postsRows.map((row) => {
         const texto = String(row.conteudo ?? '')
         const titulo =
             texto.split('\n').find((line) => line.trim().length > 0)?.slice(0, 48) || 'Aviso do CT'
@@ -305,7 +416,7 @@ export async function fetchHomeData(alunoId: string): Promise<HomeData> {
 
     return {
         stories,
-        notificacoesNaoLidas: notifsRes.count ?? 0,
+        notificacoesNaoLidas,
         avisos,
         aulasHoje,
         proximaAula,
@@ -319,31 +430,47 @@ export async function setPresencaStatus(
 ) {
     const existing = await supabase
         .from('presencas')
-        .select('id')
+        .select('id, status')
         .eq('aluno_id', alunoId)
         .eq('aula_id', aulaId)
-        .maybeSingle()
+        .order('updated_at', { ascending: false })
 
-    if (existing.data?.id) {
-        await supabase
+    if (existing.error) {
+        throw new Error(`Nao foi possivel consultar presenca: ${existing.error.message}`)
+    }
+
+    const existingRows = existing.data ?? []
+    const hadRows = existingRows.length > 0
+    const wasPresente = existingRows.some((row) => row.status === 'presente')
+
+    if (hadRows) {
+        const updateRes = await supabase
             .from('presencas')
             .update({
                 status,
                 data_checkin: status === 'presente' ? new Date().toISOString() : null,
             })
-            .eq('id', existing.data.id)
-        return
+            .eq('aluno_id', alunoId)
+            .eq('aula_id', aulaId)
+
+        if (updateRes.error) {
+            throw new Error(`Nao foi possivel atualizar presenca: ${updateRes.error.message}`)
+        }
+    } else {
+        const insertRes = await supabase.from('presencas').insert({
+            aluno_id: alunoId,
+            aula_id: aulaId,
+            status,
+            data_checkin: status === 'presente' ? new Date().toISOString() : null,
+        })
+
+        if (insertRes.error) {
+            throw new Error(`Nao foi possivel criar presenca: ${insertRes.error.message}`)
+        }
     }
 
-    await supabase.from('presencas').insert({
-        aluno_id: alunoId,
-        aula_id: aulaId,
-        status,
-        data_checkin: status === 'presente' ? new Date().toISOString() : null,
-    })
-
-    // Se for um check-in (presente), notifica o admin/professor
-    if (status === 'presente') {
+    // Se virou check-in (presente), notifica o admin/professor
+    if (status === 'presente' && !wasPresente) {
         const { data: aluno } = await supabase.from('alunos').select('nome').eq('id', alunoId).single()
         const { data: aula } = await supabase.from('aulas').select('nome, professor').eq('id', aulaId).single()
 
@@ -1019,12 +1146,21 @@ export async function fetchAulaDetalhe(alunoId: string, aulaId: string): Promise
 
     const presencasRes = await supabase
         .from('presencas')
-        .select('aluno_id, status')
+        .select('aula_id, aluno_id, status, updated_at, created_at')
         .eq('aula_id', aulaId)
-        .in('status', ['agendado', 'presente', 'confirmado'])
 
-    const presencas = (presencasRes.data as Array<{ aluno_id: string; status: string }>) ?? []
-    const alunoIds = presencas.map((row) => row.aluno_id)
+    if (presencasRes.error) {
+        console.error('[AulaDetalhe] Erro ao buscar presencas:', presencasRes.error.message)
+    }
+
+    const presencas = (presencasRes.data as PresencaRow[]) ?? []
+    const { ocupacaoByAula, userStatusByAula, statusByAulaAluno } = buildPresenceMaps(presencas, alunoId)
+
+    const alunosConfirmadosIds = Object.entries(statusByAulaAluno)
+        .filter(([key, status]) => key.startsWith(`${aulaId}::`) && COUNTED_PRESENCA_STATUSES.includes(status))
+        .map(([key]) => key.split('::')[1])
+
+    const alunoIds = [...new Set(alunosConfirmadosIds)]
 
     const alunosRes =
         alunoIds.length > 0
@@ -1036,13 +1172,14 @@ export async function fetchAulaDetalhe(alunoId: string, aulaId: string): Promise
             nomeById[aluno.id] = aluno.nome
         })
 
-    const confirmados = presencas
-        .map((presenca) => nomeById[presenca.aluno_id])
+    const confirmados = alunoIds
+        .map((id) => nomeById[id])
         .filter(Boolean)
         .slice(0, 12)
 
-    const userStatus = presencas.find((presenca) => presenca.aluno_id === alunoId)?.status ?? null
-    const mapped = mapAula(aulaRow, presencas.length)
+    const userStatus = userStatusByAula[aulaId] ?? null
+    const vagasOcupadas = ocupacaoByAula[aulaId] ?? 0
+    const mapped = mapAula(aulaRow, vagasOcupadas)
 
     return {
         id: mapped.id,
@@ -1053,7 +1190,7 @@ export async function fetchAulaDetalhe(alunoId: string, aulaId: string): Promise
         professor: mapped.professor,
         descricao: mapped.descricao ?? 'Treino tecnico de boxe para todos os niveis.',
         vagas_total: mapped.vagas_total,
-        vagas_ocupadas: presencas.length,
+        vagas_ocupadas: vagasOcupadas,
         confirmados,
         userStatus,
     }

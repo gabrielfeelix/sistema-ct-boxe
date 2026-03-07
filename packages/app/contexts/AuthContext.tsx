@@ -26,19 +26,30 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 async function fetchAlunoProfile(user: User): Promise<AlunoProfile | null> {
-    const byId = await supabase.from('alunos').select('*').eq('id', user.id).maybeSingle()
+    try {
+        const byId = await supabase.from('alunos').select('*').eq('id', user.id).maybeSingle()
+        if (byId.error) {
+            console.error('[Auth] Falha ao buscar aluno por id:', byId.error.message)
+        }
+        if (byId.data) return byId.data as AlunoProfile
 
-    if (byId.data) return byId.data as AlunoProfile
+        if (!user.email) return null
 
-    if (!user.email) return null
+        const byEmail = await supabase
+            .from('alunos')
+            .select('*')
+            .eq('email', user.email.toLowerCase())
+            .maybeSingle()
 
-    const byEmail = await supabase
-        .from('alunos')
-        .select('*')
-        .eq('email', user.email.toLowerCase())
-        .maybeSingle()
+        if (byEmail.error) {
+            console.error('[Auth] Falha ao buscar aluno por email:', byEmail.error.message)
+        }
 
-    return (byEmail.data as AlunoProfile | null) ?? null
+        return (byEmail.data as AlunoProfile | null) ?? null
+    } catch (error) {
+        console.error('[Auth] Erro inesperado ao buscar perfil do aluno:', error)
+        return null
+    }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -59,24 +70,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let active = true
 
-        async function bootstrap() {
-            const {
-                data: { session: currentSession },
-            } = await supabase.auth.getSession()
-
+        async function resolveSession(nextSession: Session | null) {
             if (!active) return
 
-            setSession(currentSession)
+            setLoading(true)
+            setSession(nextSession)
 
-            if (currentSession?.user) {
-                const profile = await fetchAlunoProfile(currentSession.user)
+            try {
+                if (nextSession?.user) {
+                    const profile = await fetchAlunoProfile(nextSession.user)
+                    if (!active) return
+                    setAluno(profile)
+                } else {
+                    setAluno(null)
+                }
+            } catch (error) {
                 if (!active) return
-                setAluno(profile)
-            } else {
+                console.error('[Auth] Erro ao resolver sessão:', error)
                 setAluno(null)
+            } finally {
+                if (active) setLoading(false)
             }
+        }
 
-            if (active) setLoading(false)
+        async function bootstrap() {
+            try {
+                const {
+                    data: { session: currentSession },
+                } = await supabase.auth.getSession()
+                if (!active) return
+                await resolveSession(currentSession)
+            } catch (error) {
+                if (!active) return
+                console.error('[Auth] Erro no bootstrap da sessão:', error)
+                setSession(null)
+                setAluno(null)
+                setLoading(false)
+            }
         }
 
         bootstrap()
@@ -84,14 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-            setSession(nextSession)
-            if (nextSession?.user) {
-                const profile = await fetchAlunoProfile(nextSession.user)
-                if (active) setAluno(profile)
-            } else {
-                setAluno(null)
-            }
-            if (active) setLoading(false)
+            await resolveSession(nextSession)
         })
 
         return () => {
@@ -138,4 +161,3 @@ export function useAuth() {
     }
     return context
 }
-

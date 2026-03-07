@@ -8,13 +8,13 @@ import { Alert, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
-import { toBRDate, toCurrencyBRL } from '@/lib/formatters'
 import { useContratoStatus } from '@/hooks/useContratoStatus'
+import { toBRDate, toCurrencyBRL } from '@/lib/formatters'
 
 function AppLayoutShell() {
     const pathname = usePathname()
     const router = useRouter()
-    const { session, aluno, loading, signOut } = useAuth()
+    const { session, aluno, loading, refreshAluno, signOut } = useAuth()
     const { status: contrato } = useContratoStatus(aluno?.id)
     const [showBanner, setShowBanner] = useState(true)
 
@@ -28,19 +28,10 @@ function AppLayoutShell() {
             return
         }
 
-        if (session && !aluno) {
-            // O usuario nao e aluno (provavelmente Admin testando no Web / mesmo localhost)
-            // Forçamos o logout para limpar a sessão no aplicativo Auth e exibir login falso
-            signOut().then(() => {
-                if (!inAuthRoute) router.replace('/auth/login')
-            })
-            return
-        }
-
         if (session && aluno && inAuthRoute) {
             router.replace('/(tabs)')
         }
-    }, [loading, pathname, router, session, aluno, signOut])
+    }, [aluno, loading, pathname, router, session])
 
     const isVencendo = contrato.status === 'vencendo'
     const isBloqueado = contrato.status === 'vencido'
@@ -49,6 +40,7 @@ function AppLayoutShell() {
         pathname === '/pagamento' || pathname === '/dados-cadastrais' || pathname === '/auth/login'
 
     const showBlocker = Boolean(session && isBloqueado && !isEscapeRoute)
+    const showProfilePending = Boolean(session && !aluno && !loading && !pathname.startsWith('/auth'))
 
     const handleRenovarClick = () => {
         router.push('/pagamento')
@@ -191,6 +183,41 @@ function AppLayoutShell() {
                         </ScrollView>
                     </View>
                 )}
+
+                {showProfilePending && (
+                    <View className="absolute inset-0 z-[90] items-center justify-center bg-white/95 px-6">
+                        <View className="w-full max-w-sm rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-900/10">
+                            <Text className="mb-2 text-lg font-black tracking-tight text-slate-900">
+                                Sincronizando perfil
+                            </Text>
+                            <Text className="mb-6 text-sm font-medium leading-relaxed text-slate-500">
+                                Seu login foi identificado, mas os dados do aluno ainda nao chegaram.
+                            </Text>
+
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={refreshAluno}
+                                className="mb-3 h-12 items-center justify-center rounded-xl bg-slate-900"
+                            >
+                                <Text className="text-xs font-black uppercase tracking-widest text-white">
+                                    Tentar Novamente
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                    signOut().then(() => router.replace('/auth/login'))
+                                }}
+                                className="h-12 items-center justify-center rounded-xl border border-slate-200 bg-white"
+                            >
+                                <Text className="text-xs font-black uppercase tracking-widest text-slate-700">
+                                    Sair da Conta
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </View>
         </GluestackUIProvider>
     )
@@ -205,4 +232,3 @@ export default function RootLayout() {
         </ErrorBoundary>
     )
 }
-

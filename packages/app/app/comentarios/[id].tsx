@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { Children, useCallback, useEffect, useState } from 'react'
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
@@ -18,10 +18,21 @@ export default function ComentariosModal() {
     const [saving, setSaving] = useState(false)
 
     const loadData = useCallback(async () => {
-        if (!aluno?.id || !id) return
-        const found = await fetchSinglePost(aluno.id, id)
-        setPost(found)
-        setLoading(false)
+        if (!aluno?.id || !id) {
+            setLoading(false)
+            return
+        }
+
+        setLoading(true)
+        try {
+            const found = await fetchSinglePost(aluno.id, id)
+            setPost(found)
+        } catch (error) {
+            console.error('[Comentarios] Erro ao carregar post:', error)
+            setPost(null)
+        } finally {
+            setLoading(false)
+        }
     }, [aluno?.id, id])
 
     useEffect(() => {
@@ -100,21 +111,23 @@ export default function ComentariosModal() {
                         <Text className="text-slate-400 text-sm mt-1">Seja o primeiro a comentar!</Text>
                     </View>
                 ) : (
-                    post.comentarios.map((comentario) => (
-                        <View key={comentario.id} className="mb-4 flex-row items-start">
-                            <View className="mr-3 mt-1 h-8 w-8 items-center justify-center rounded-full bg-slate-100">
-                                <Text className="text-xs font-bold text-slate-600">
-                                    {comentario.autor.charAt(0).toUpperCase()}
-                                </Text>
+                    Children.toArray(
+                        post.comentarios.map((comentario) => (
+                            <View className="mb-4 flex-row items-start">
+                                <View className="mr-3 mt-1 h-8 w-8 items-center justify-center rounded-full bg-slate-100">
+                                    <Text className="text-xs font-bold text-slate-600">
+                                        {comentario.autor.charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
+                                <View className="flex-1 rounded-2xl rounded-tl-none bg-slate-50 px-4 py-3 border border-slate-100">
+                                    <Text className="font-bold text-slate-900 mb-1">{comentario.autor}</Text>
+                                    <Text className="text-sm font-medium text-slate-700 leading-relaxed">
+                                        {comentario.texto}
+                                    </Text>
+                                </View>
                             </View>
-                            <View className="flex-1 rounded-2xl rounded-tl-none bg-slate-50 px-4 py-3 border border-slate-100">
-                                <Text className="font-bold text-slate-900 mb-1">{comentario.autor}</Text>
-                                <Text className="text-sm font-medium text-slate-700 leading-relaxed">
-                                    {comentario.texto}
-                                </Text>
-                            </View>
-                        </View>
-                    ))
+                        ))
+                    )
                 )}
             </ScrollView>
 

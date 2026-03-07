@@ -1,10 +1,11 @@
 import { Feather } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Children, useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchAulaDetalhe, setPresencaStatus, type AulaDetalhe } from '@/lib/appData'
+import { toISODateLocal } from '@/lib/formatters'
 
 export default function AulaDetailModal() {
     const { id } = useLocalSearchParams<{ id?: string }>()
@@ -21,9 +22,16 @@ export default function AulaDetailModal() {
             return
         }
 
-        const data = await fetchAulaDetalhe(aluno.id, id)
-        setAula(data)
-        setLoading(false)
+        setLoading(true)
+        try {
+            const data = await fetchAulaDetalhe(aluno.id, id)
+            setAula(data)
+        } catch (error) {
+            console.error('[AulaDetalhe] Erro ao carregar aula:', error)
+            setAula(null)
+        } finally {
+            setLoading(false)
+        }
     }, [aluno?.id, id])
 
     useEffect(() => {
@@ -40,7 +48,7 @@ export default function AulaDetailModal() {
     const isPresente = aula?.userStatus === 'presente'
 
     const now = new Date()
-    const currentISO = now.toISOString().slice(0, 10)
+    const currentISO = toISODateLocal(now)
     const currentMinutes = now.getHours() * 60 + now.getMinutes()
     const classMinutes = aula ? (Number(aula.horario.split(':')[0]) * 60 + Number(aula.horario.split(':')[1])) : 0
     const isToday = aula?.dataISO === currentISO
@@ -50,13 +58,19 @@ export default function AulaDetailModal() {
         if (!aluno?.id || !aula || saving || isPresente) return
 
         setSaving(true)
-        if (isAgendado) {
-            await setPresencaStatus(aluno.id, aula.id, 'cancelada')
-        } else {
-            await setPresencaStatus(aluno.id, aula.id, 'agendado')
+        try {
+            if (isAgendado) {
+                await setPresencaStatus(aluno.id, aula.id, 'cancelada')
+            } else {
+                await setPresencaStatus(aluno.id, aula.id, 'agendado')
+            }
+            await loadData()
+        } catch (error) {
+            console.error('[AulaDetalhe] Erro ao atualizar presenca:', error)
+            Alert.alert('Erro', 'Não foi possível atualizar o agendamento desta aula.')
+        } finally {
+            setSaving(false)
         }
-        await loadData()
-        setSaving(false)
     }
 
     const buttonLabel = (() => {
@@ -152,22 +166,21 @@ export default function AulaDetailModal() {
                                     {aula.confirmados.length > 0 ? (
                                         <View className="flex-row items-center">
                                             <View className="mr-4 flex-row -space-x-4">
-                                                {aula.confirmados.slice(0, 5).map((nome, index) => {
-                                                    const iniciais = nome
-                                                        .split(' ')
-                                                        .map((part) => part[0])
-                                                        .join('')
-                                                        .substring(0, 2)
-                                                        .toUpperCase()
-                                                    return (
-                                                        <View
-                                                            key={`${nome}-${index}`}
-                                                            className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#CC0000]"
-                                                        >
-                                                            <Text className="text-[10px] font-black text-white">{iniciais}</Text>
-                                                        </View>
-                                                    )
-                                                })}
+                                                {Children.toArray(
+                                                    aula.confirmados.slice(0, 5).map((nome) => {
+                                                        const iniciais = nome
+                                                            .split(' ')
+                                                            .map((part) => part[0])
+                                                            .join('')
+                                                            .substring(0, 2)
+                                                            .toUpperCase()
+                                                        return (
+                                                            <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#CC0000]">
+                                                                <Text className="text-[10px] font-black text-white">{iniciais}</Text>
+                                                            </View>
+                                                        )
+                                                    })
+                                                )}
                                             </View>
                                             <Text className="text-sm font-medium text-slate-500" numberOfLines={1}>
                                                 {aula.confirmados[0]}

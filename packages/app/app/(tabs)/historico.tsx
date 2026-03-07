@@ -1,5 +1,5 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Children, cloneElement, useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
@@ -107,7 +107,7 @@ export default function HistoricoScreen() {
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
-            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-8 pt-16">
+            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-8 pt-12">
                 <Text className="mb-1 text-sm font-bold uppercase tracking-widest text-slate-500">Estatisticas</Text>
                 <Text className="text-4xl font-black tracking-tight text-slate-900">Historico</Text>
             </View>
@@ -189,75 +189,85 @@ export default function HistoricoScreen() {
 
                     <View className="mb-10 overflow-hidden rounded-b-2xl border border-slate-100 bg-white shadow-sm shadow-slate-200/50">
                         <View className="flex-row border-b border-slate-100 bg-slate-50">
-                            {DAY_HEADERS.map((day) => (
-                                <View key={day} className="flex-1 items-center py-3">
-                                    <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        {day}
-                                    </Text>
-                                </View>
-                            ))}
+                            {Children.toArray(
+                                DAY_HEADERS.map((day) =>
+                                    cloneElement(
+                                        <View className="flex-1 items-center py-3">
+                                            <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                {day}
+                                            </Text>
+                                        </View>,
+                                        { key: day }
+                                    )
+                                )
+                            )}
                         </View>
 
                         <View className="p-4 pb-6">
-                            {weeks.map((semana, indexSemana) => (
-                                <View key={`week-${indexSemana}`} className="flex-row mb-3 last:mb-0">
-                                    {semana.map((dia, indexDia) => {
-                                        const hasPresenca = dia ? historico.diasComPresenca.includes(dia) : false
-                                        const isHoje = Boolean(dia && isCurrentMonth && dia === today.getDate())
+                            {Children.toArray(
+                                weeks.map((semana, indexSemana) =>
+                                    cloneElement(
+                                        <View className="flex-row mb-3 last:mb-0">
+                                            {semana.map((dia, indexDia) => {
+                                                const hasPresenca = dia ? historico.diasComPresenca.includes(dia) : false
+                                                const isHoje = Boolean(dia && isCurrentMonth && dia === today.getDate())
 
-                                        const handleDayPress = () => {
-                                            if (!dia) return
-                                            setDiaSelecionado(dia)
-                                        }
+                                                const handleDayPress = () => {
+                                                    if (!dia) return
+                                                    setDiaSelecionado(dia)
+                                                }
 
-                                        return (
-                                            <TouchableOpacity
-                                                key={dia ?? `empty-${indexSemana}-${indexDia}`}
-                                                className="relative flex-1 items-center justify-center px-1"
-                                                disabled={!dia}
-                                                activeOpacity={0.7}
-                                                onPress={handleDayPress}
-                                            >
-                                                {dia && (
-                                                    <View
-                                                        className={`items-center justify-center h-10 w-10 ${diaSelecionado === dia
-                                                            ? ''
-                                                            : isHoje && !hasPresenca
-                                                                ? 'border-2 border-slate-900 bg-white'
-                                                                : hasPresenca
-                                                                    ? 'border border-red-100 bg-red-50'
-                                                                    : 'bg-transparent'
-                                                            }`}
-                                                        style={{
-                                                            backgroundColor: diaSelecionado === dia ? '#CC0000' : undefined,
-                                                            borderRadius: 9999
-                                                        }}
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={dia ?? `empty-${indexSemana}-${indexDia}`}
+                                                        className="relative flex-1 items-center justify-center px-1"
+                                                        disabled={!dia}
+                                                        activeOpacity={0.7}
+                                                        onPress={handleDayPress}
                                                     >
-                                                        <Text
-                                                            className={`text-base font-bold ${diaSelecionado === dia
-                                                                ? ''
-                                                                : isHoje && !hasPresenca
-                                                                    ? 'text-slate-900'
-                                                                    : hasPresenca
-                                                                        ? 'text-[#CC0000]'
-                                                                        : 'text-slate-600'
-                                                                }`}
-                                                            style={{
-                                                                color: diaSelecionado === dia ? '#FFFFFF' : undefined
-                                                            }}
-                                                        >
-                                                            {dia}
-                                                        </Text>
-                                                        {hasPresenca && diaSelecionado !== dia && (
-                                                            <View className="absolute bottom-2 h-1.5 w-1.5 rounded-full bg-[#CC0000]" />
+                                                        {dia && (
+                                                            <View
+                                                                className={`items-center justify-center h-10 w-10 ${diaSelecionado === dia
+                                                                    ? ''
+                                                                    : isHoje && !hasPresenca
+                                                                        ? 'border-2 border-slate-900 bg-white'
+                                                                        : hasPresenca
+                                                                            ? 'border border-red-100 bg-red-50'
+                                                                            : 'bg-transparent'
+                                                                    }`}
+                                                                style={{
+                                                                    backgroundColor: diaSelecionado === dia ? '#CC0000' : undefined,
+                                                                    borderRadius: 9999
+                                                                }}
+                                                            >
+                                                                <Text
+                                                                    className={`text-base font-bold ${diaSelecionado === dia
+                                                                        ? ''
+                                                                        : isHoje && !hasPresenca
+                                                                            ? 'text-slate-900'
+                                                                            : hasPresenca
+                                                                                ? 'text-[#CC0000]'
+                                                                                : 'text-slate-600'
+                                                                        }`}
+                                                                    style={{
+                                                                        color: diaSelecionado === dia ? '#FFFFFF' : undefined
+                                                                    }}
+                                                                >
+                                                                    {dia}
+                                                                </Text>
+                                                                {hasPresenca && diaSelecionado !== dia && (
+                                                                    <View className="absolute bottom-2 h-1.5 w-1.5 rounded-full bg-[#CC0000]" />
+                                                                )}
+                                                            </View>
                                                         )}
-                                                    </View>
-                                                )}
-                                            </TouchableOpacity>
-                                        )
-                                    })}
-                                </View>
-                            ))}
+                                                    </TouchableOpacity>
+                                                )
+                                            })}
+                                        </View>,
+                                        { key: `week-${indexSemana}` }
+                                    )
+                                )
+                            )}
                         </View>
                     </View>
 
@@ -272,30 +282,35 @@ export default function HistoricoScreen() {
                             </View>
                         ) : historico.presencasLista.length > 0 ? (
                             <View className="rounded-3xl border border-slate-100 bg-white p-2 shadow-sm shadow-slate-200/50">
-                                {historico.presencasLista.map((presenca, index) => (
-                                    <View
-                                        key={presenca.id}
-                                        className={`flex-row items-center p-4 ${index !== historico.presencasLista.length - 1
-                                            ? 'border-b border-slate-50'
-                                            : ''
-                                            }`}
-                                    >
-                                        <View className="mr-5 h-12 w-12 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50">
-                                            <Feather name="check" size={18} color="#10B981" />
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">
-                                                {presenca.aula}
-                                            </Text>
-                                            <View className="flex-row items-center">
-                                                <Feather name="clock" size={12} color="#94A3B8" />
-                                                <Text className="ml-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-                                                    {presenca.data}
+                                {Children.toArray(
+                                    historico.presencasLista.map((presenca, index) =>
+                                        cloneElement(
+                                        <View
+                                            className={`flex-row items-center p-4 ${index !== historico.presencasLista.length - 1
+                                                ? 'border-b border-slate-50'
+                                                : ''
+                                                }`}
+                                        >
+                                            <View className="mr-5 h-12 w-12 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50">
+                                                <Feather name="check" size={18} color="#10B981" />
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text className="mb-1 text-lg font-bold tracking-tight text-slate-900">
+                                                    {presenca.aula}
                                                 </Text>
+                                                <View className="flex-row items-center">
+                                                    <Feather name="clock" size={12} color="#94A3B8" />
+                                                    <Text className="ml-2 text-xs font-bold uppercase tracking-widest text-slate-500">
+                                                        {presenca.data}
+                                                    </Text>
+                                                </View>
                                             </View>
                                         </View>
-                                    </View>
-                                ))}
+                                        ,
+                                        { key: presenca.id }
+                                        )
+                                    )
+                                )}
                             </View>
                         ) : (
                             <View className="items-center justify-center rounded-3xl border border-dashed border-slate-100 bg-white px-8 py-16">
@@ -313,4 +328,3 @@ export default function HistoricoScreen() {
         </View>
     )
 }
-

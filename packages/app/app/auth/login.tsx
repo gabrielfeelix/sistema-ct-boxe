@@ -1,5 +1,4 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
     Alert,
@@ -16,7 +15,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginScreen() {
-    const router = useRouter()
     const { signIn } = useAuth()
 
     const [email, setEmail] = useState('')
@@ -51,7 +49,7 @@ export default function LoginScreen() {
             return
         }
 
-        router.replace('/(tabs)/')
+        // Deixa o guard global redirecionar quando sessao + perfil estiverem sincronizados
     }
 
     const handleForgotPassword = async () => {
@@ -197,4 +195,3 @@ export default function LoginScreen() {
         </View>
     )
 }
-

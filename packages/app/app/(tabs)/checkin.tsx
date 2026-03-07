@@ -70,19 +70,31 @@ export default function CheckinScreen() {
     const handleConfirmarPresenca = useCallback(async (aulaId: string) => {
         if (!aluno?.id || loadingAction) return
         setLoadingAction(true)
-        await setPresencaStatus(aluno.id, aulaId, 'agendado')
-        await loadData()
-        setLoadingAction(false)
-        Alert.alert('Presença confirmada', 'Você está confirmado para esta aula!')
+        try {
+            await setPresencaStatus(aluno.id, aulaId, 'agendado')
+            await loadData()
+            Alert.alert('Presença confirmada', 'Você está confirmado para esta aula!')
+        } catch (error) {
+            console.error('[Checkin] Erro ao confirmar presenca:', error)
+            Alert.alert('Erro', 'Não foi possível confirmar presença. Tente novamente.')
+        } finally {
+            setLoadingAction(false)
+        }
     }, [aluno?.id, loadingAction, loadData])
 
     const handleListaEspera = useCallback(async (aulaId: string) => {
         if (!aluno?.id || loadingAction) return
         setLoadingAction(true)
-        await setPresencaStatus(aluno.id, aulaId, 'agendado')
-        await loadData()
-        setLoadingAction(false)
-        Alert.alert('Lista de espera', 'Você foi adicionado à lista de espera.')
+        try {
+            await setPresencaStatus(aluno.id, aulaId, 'agendado')
+            await loadData()
+            Alert.alert('Lista de espera', 'Você foi adicionado à lista de espera.')
+        } catch (error) {
+            console.error('[Checkin] Erro ao entrar na lista de espera:', error)
+            Alert.alert('Erro', 'Não foi possível atualizar sua inscrição. Tente novamente.')
+        } finally {
+            setLoadingAction(false)
+        }
     }, [aluno?.id, loadingAction, loadData])
 
     const handleCancelar = useCallback((aulaId: string) => {
@@ -118,7 +130,7 @@ export default function CheckinScreen() {
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
-            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 pt-16 shadow-sm shadow-slate-200/50">
+            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 pt-12 shadow-sm shadow-slate-200/50">
                 <Text className="mb-1 text-sm font-bold uppercase tracking-widest text-slate-500">Passaporte</Text>
                 <Text className="mb-6 text-4xl font-black tracking-tight text-slate-900">Check-in</Text>
 

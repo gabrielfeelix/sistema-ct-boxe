@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "817fbd88-d494-41ba-893b-c3a6a60691c5"
+      }
+    },
+    "android": {
+      "package": "com.neoespect.sistemactboxe"
+    }
+  }
+}

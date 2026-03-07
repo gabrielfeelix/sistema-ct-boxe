@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Animated, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Children, useEffect, useMemo, useState } from 'react'
+import { Animated, Platform, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 
@@ -31,6 +31,7 @@ function startOfToday() {
 export default function EventosScreen() {
     const router = useRouter()
     const { aluno } = useAuth()
+    const shouldUseNativeDriver = Platform.OS !== 'web'
     const [eventos, setEventos] = useState<EventoApp[]>([])
     const [mesAtualIndex, setMesAtualIndex] = useState(0)
     const [animValues, setAnimValues] = useState<Record<string, Animated.Value>>({})
@@ -113,8 +114,8 @@ export default function EventosScreen() {
 
         const anim = getAnimValue(evento.id)
         Animated.sequence([
-            Animated.timing(anim, { toValue: 0.9, duration: 80, useNativeDriver: true }),
-            Animated.timing(anim, { toValue: 1, duration: 150, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0.9, duration: 80, useNativeDriver: shouldUseNativeDriver }),
+            Animated.timing(anim, { toValue: 1, duration: 150, useNativeDriver: shouldUseNativeDriver }),
         ]).start()
 
         const delta = confirmar ? 1 : -1
@@ -205,108 +206,92 @@ export default function EventosScreen() {
                             <Text className="text-sm font-medium text-slate-500">Carregando eventos...</Text>
                         </View>
                     ) : eventosFiltrados.length > 0 ? (
-                        eventosFiltrados.map((evento) => {
-                            const isConfirmado = evento.status_usuario === 'confirmado'
-                            const scale = getAnimValue(evento.id)
-                            const isPast = new Date(evento.data_evento) < startOfToday()
+                        Children.toArray(
+                            eventosFiltrados.map((evento) => {
+                                const isConfirmado = evento.status_usuario === 'confirmado'
+                                const scale = getAnimValue(evento.id)
+                                const isPast = new Date(evento.data_evento) < startOfToday()
 
-                            return (
-                                <View
-                                    key={evento.id}
-                                    className={`mb-5 rounded-3xl border p-5 shadow-sm ${
-                                        isPast
-                                            ? 'border-slate-200 bg-slate-50 opacity-60'
-                                            : evento.destaque
-                                              ? 'border-slate-800 bg-[#111111]'
-                                              : 'border-slate-100 bg-white'
-                                    }`}
-                                >
-                                    <View className="mb-4 flex-row items-start justify-between">
-                                        <View className="flex-row items-center">
-                                            <View
-                                                className={`mr-4 h-12 w-12 items-center justify-center rounded-2xl border ${
-                                                    isPast
-                                                        ? 'border-slate-200 bg-white'
-                                                        : evento.destaque
-                                                          ? 'border-white/20 bg-white/10'
-                                                          : 'border-slate-100 bg-slate-50'
-                                                }`}
-                                            >
-                                                <Feather
-                                                    name="calendar"
-                                                    size={18}
-                                                    color={isPast ? '#94A3B8' : evento.destaque ? '#E2E8F0' : '#334155'}
-                                                />
+                                return (
+                                    <View
+                                        className={`mb-5 rounded-3xl border p-5 shadow-sm ${
+                                            isPast
+                                                ? 'border-slate-200 bg-slate-50 opacity-60'
+                                                : evento.destaque
+                                                  ? 'border-slate-800 bg-[#111111]'
+                                                  : 'border-slate-100 bg-white'
+                                        }`}
+                                    >
+                                        <View className="mb-4 flex-row items-start justify-between">
+                                            <View className="flex-row items-center">
+                                                <View
+                                                    className={`mr-4 h-12 w-12 items-center justify-center rounded-2xl border ${
+                                                        isPast
+                                                            ? 'border-slate-200 bg-white'
+                                                            : evento.destaque
+                                                              ? 'border-white/20 bg-white/10'
+                                                              : 'border-slate-100 bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <Feather
+                                                        name="calendar"
+                                                        size={18}
+                                                        color={isPast ? '#94A3B8' : evento.destaque ? '#E2E8F0' : '#334155'}
+                                                    />
+                                                </View>
+                                                <View className="flex-1">
+                                                    <Text
+                                                        className={`mb-1 text-[10px] font-black uppercase tracking-widest ${
+                                                            isPast
+                                                                ? 'text-slate-400'
+                                                                : evento.destaque
+                                                                  ? 'text-slate-400'
+                                                                  : 'text-slate-500'
+                                                        }`}
+                                                    >
+                                                        {toBRDate(evento.data_evento)}
+                                                    </Text>
+                                                    <Text
+                                                        className={`text-lg font-bold tracking-tight ${
+                                                            isPast
+                                                                ? 'text-slate-600'
+                                                                : evento.destaque
+                                                                  ? 'text-white'
+                                                                  : 'text-slate-900'
+                                                        }`}
+                                                        numberOfLines={1}
+                                                    >
+                                                        {evento.titulo}
+                                                    </Text>
+                                                </View>
                                             </View>
-                                            <View className="flex-1">
+                                        </View>
+
+                                        <View
+                                            className={`mb-5 rounded-2xl border p-4 ${
+                                                isPast
+                                                    ? 'border-slate-100 bg-white'
+                                                    : evento.destaque
+                                                      ? 'border-white/10 bg-white/5'
+                                                      : 'border-slate-100 bg-slate-50'
+                                            }`}
+                                        >
+                                            <View className="mb-2 flex-row items-center">
+                                                <Feather name="map-pin" size={14} color="#94A3B8" />
                                                 <Text
-                                                    className={`mb-1 text-[10px] font-black uppercase tracking-widest ${
+                                                    className={`ml-2 text-sm font-bold ${
                                                         isPast
                                                             ? 'text-slate-400'
                                                             : evento.destaque
-                                                              ? 'text-slate-400'
-                                                              : 'text-slate-500'
+                                                              ? 'text-slate-300'
+                                                              : 'text-slate-700'
                                                     }`}
                                                 >
-                                                    {toBRDate(evento.data_evento)}
-                                                </Text>
-                                                <Text
-                                                    className={`text-lg font-bold tracking-tight ${
-                                                        isPast
-                                                            ? 'text-slate-600'
-                                                            : evento.destaque
-                                                              ? 'text-white'
-                                                              : 'text-slate-900'
-                                                    }`}
-                                                    numberOfLines={1}
-                                                >
-                                                    {evento.titulo}
+                                                    {evento.local}
                                                 </Text>
                                             </View>
-                                        </View>
-                                    </View>
-
-                                    <View
-                                        className={`mb-5 rounded-2xl border p-4 ${
-                                            isPast
-                                                ? 'border-slate-100 bg-white'
-                                                : evento.destaque
-                                                  ? 'border-white/10 bg-white/5'
-                                                  : 'border-slate-100 bg-slate-50'
-                                        }`}
-                                    >
-                                        <View className="mb-2 flex-row items-center">
-                                            <Feather name="map-pin" size={14} color="#94A3B8" />
                                             <Text
-                                                className={`ml-2 text-sm font-bold ${
-                                                    isPast
-                                                        ? 'text-slate-400'
-                                                        : evento.destaque
-                                                          ? 'text-slate-300'
-                                                          : 'text-slate-700'
-                                                }`}
-                                            >
-                                                {evento.local}
-                                            </Text>
-                                        </View>
-                                        <Text
-                                            className={`mt-1 text-xs leading-relaxed ${
-                                                isPast
-                                                    ? 'text-slate-400'
-                                                    : evento.destaque
-                                                      ? 'text-slate-400'
-                                                      : 'text-slate-500'
-                                            }`}
-                                        >
-                                            {evento.descricao}
-                                        </Text>
-                                    </View>
-
-                                    <View className="mt-2 flex-row items-center justify-between border-t border-dashed border-slate-200/20 pt-2">
-                                        <View className="flex-row items-center">
-                                            <FontAwesome5 name="users" size={12} color="#94A3B8" />
-                                            <Text
-                                                className={`ml-2 text-xs font-bold ${
+                                                className={`mt-1 text-xs leading-relaxed ${
                                                     isPast
                                                         ? 'text-slate-400'
                                                         : evento.destaque
@@ -314,64 +299,81 @@ export default function EventosScreen() {
                                                           : 'text-slate-500'
                                                 }`}
                                             >
-                                                {evento.confirmados} Respostas
+                                                {evento.descricao}
                                             </Text>
                                         </View>
 
-                                        {!isPast ? (
-                                            <Animated.View style={{ transform: [{ scale }] }}>
-                                                {isConfirmado ? (
-                                                    <TouchableOpacity
-                                                        activeOpacity={0.8}
-                                                        onPress={() => handleConfirmacao(evento, false)}
-                                                        className={`h-10 flex-row items-center justify-center rounded-xl border px-4 ${
-                                                            evento.destaque
-                                                                ? 'border-emerald-500/30 bg-emerald-500/20'
-                                                                : 'border-emerald-200 bg-emerald-50'
-                                                        }`}
-                                                    >
-                                                        <Feather
-                                                            name="check"
-                                                            size={14}
-                                                            color={evento.destaque ? '#34D399' : '#059669'}
-                                                        />
-                                                        <Text
-                                                            className={`ml-2 text-[10px] font-black uppercase tracking-widest ${
-                                                                evento.destaque ? 'text-emerald-400' : 'text-emerald-700'
-                                                            }`}
-                                                        >
-                                                            To dentro!
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                ) : (
-                                                    <TouchableOpacity
-                                                        activeOpacity={0.8}
-                                                        onPress={() => handleConfirmacao(evento, true)}
-                                                        className={`h-10 flex-row items-center justify-center rounded-xl px-4 ${
-                                                            evento.destaque ? 'bg-white' : 'bg-slate-900'
-                                                        }`}
-                                                    >
-                                                        <Text
-                                                            className={`text-[10px] font-black uppercase tracking-widest ${
-                                                                evento.destaque ? 'text-slate-900' : 'text-white'
-                                                            }`}
-                                                        >
-                                                            Confirmar Presenca
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </Animated.View>
-                                        ) : (
-                                            <View className="rounded-md bg-slate-200 px-3 py-1.5">
-                                                <Text className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                                    Encerrado
+                                        <View className="mt-2 flex-row items-center justify-between border-t border-dashed border-slate-200/20 pt-2">
+                                            <View className="flex-row items-center">
+                                                <FontAwesome5 name="users" size={12} color="#94A3B8" />
+                                                <Text
+                                                    className={`ml-2 text-xs font-bold ${
+                                                        isPast
+                                                            ? 'text-slate-400'
+                                                            : evento.destaque
+                                                              ? 'text-slate-400'
+                                                              : 'text-slate-500'
+                                                    }`}
+                                                >
+                                                    {evento.confirmados} Respostas
                                                 </Text>
                                             </View>
-                                        )}
+
+                                            {!isPast ? (
+                                                <Animated.View style={{ transform: [{ scale }] }}>
+                                                    {isConfirmado ? (
+                                                        <TouchableOpacity
+                                                            activeOpacity={0.8}
+                                                            onPress={() => handleConfirmacao(evento, false)}
+                                                            className={`h-10 flex-row items-center justify-center rounded-xl border px-4 ${
+                                                                evento.destaque
+                                                                    ? 'border-emerald-500/30 bg-emerald-500/20'
+                                                                    : 'border-emerald-200 bg-emerald-50'
+                                                            }`}
+                                                        >
+                                                            <Feather
+                                                                name="check"
+                                                                size={14}
+                                                                color={evento.destaque ? '#34D399' : '#059669'}
+                                                            />
+                                                            <Text
+                                                                className={`ml-2 text-[10px] font-black uppercase tracking-widest ${
+                                                                    evento.destaque ? 'text-emerald-400' : 'text-emerald-700'
+                                                                }`}
+                                                            >
+                                                                To dentro!
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    ) : (
+                                                        <TouchableOpacity
+                                                            activeOpacity={0.8}
+                                                            onPress={() => handleConfirmacao(evento, true)}
+                                                            className={`h-10 flex-row items-center justify-center rounded-xl px-4 ${
+                                                                evento.destaque ? 'bg-white' : 'bg-slate-900'
+                                                            }`}
+                                                        >
+                                                            <Text
+                                                                className={`text-[10px] font-black uppercase tracking-widest ${
+                                                                    evento.destaque ? 'text-slate-900' : 'text-white'
+                                                                }`}
+                                                            >
+                                                                Confirmar Presenca
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </Animated.View>
+                                            ) : (
+                                                <View className="rounded-md bg-slate-200 px-3 py-1.5">
+                                                    <Text className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                                        Encerrado
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
                                     </View>
-                                </View>
-                            )
-                        })
+                                )
+                            })
+                        )
                     ) : (
                         <View className="items-center justify-center rounded-3xl border border-dashed border-slate-100 bg-white py-16">
                             <View className="mb-6 h-20 w-20 items-center justify-center rounded-full bg-slate-50">

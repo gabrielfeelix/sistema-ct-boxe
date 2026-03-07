@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { FontAwesome5, Feather } from '@expo/vector-icons';
-import { colors } from '../../constants/theme';
 
 export default function TabLayout() {
     return (
@@ -10,6 +9,7 @@ export default function TabLayout() {
                 headerShown: false,
                 tabBarActiveTintColor: '#FFFFFF',
                 tabBarInactiveTintColor: '#64748B',
+                tabBarShowLabel: false,
                 tabBarStyle: {
                     position: 'absolute',
                     backgroundColor: '#0A0F1D',
@@ -21,14 +21,15 @@ export default function TabLayout() {
                     left: 20,
                     right: 20,
                     borderRadius: 35,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 16,
-                    elevation: 10,
-                },
-                tabBarLabelStyle: {
-                    fontSize: 0,
+                    ...(Platform.OS === 'web'
+                        ? { boxShadow: '0px 8px 16px rgba(0, 0, 0, 0.3)' }
+                        : {
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 8 },
+                              shadowOpacity: 0.3,
+                              shadowRadius: 16,
+                              elevation: 10,
+                          }),
                 },
                 tabBarItemStyle: {
                     height: 70,

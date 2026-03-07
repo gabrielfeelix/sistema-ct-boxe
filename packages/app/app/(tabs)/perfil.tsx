@@ -94,7 +94,7 @@ export default function PerfilScreen() {
                 contentContainerStyle={{ paddingBottom: 120 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-                <View className="relative overflow-hidden bg-slate-900 px-6 pb-32 pt-24 shadow-2xl">
+                <View className="relative overflow-hidden bg-slate-900 px-6 pb-32 pt-16 shadow-2xl">
                     <View className="absolute top-0 right-0 h-full w-full items-center justify-center opacity-5">
                         <FontAwesome5 name="fire" size={240} color="#FFFFFF" />
                     </View>
@@ -278,4 +278,3 @@ export default function PerfilScreen() {
         </View>
     )
 }
-

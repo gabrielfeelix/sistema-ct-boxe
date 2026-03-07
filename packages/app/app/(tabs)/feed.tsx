@@ -234,7 +234,7 @@ export default function FeedScreen() {
 
     return (
         <View className="flex-1 bg-[#FDFDFD]">
-            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 pt-16 shadow-sm shadow-slate-200/50">
+            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 pt-12 shadow-sm shadow-slate-200/50">
                 <Text className="mb-2 text-4xl font-black tracking-tight text-slate-900">COMUNIDADE</Text>
                 <Text className="text-sm font-medium text-slate-500">Eventos, resenhas e evolução.</Text>
             </View>
@@ -561,4 +561,3 @@ export default function FeedScreen() {
         </View>
     )
 }
-

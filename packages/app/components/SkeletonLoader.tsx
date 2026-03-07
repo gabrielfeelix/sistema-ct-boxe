@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { Animated, View } from 'react-native'
+import { Animated, Platform, View } from 'react-native'
 
-export function SkeletonBox({ width, height, className = '' }: { width: number | string; height: number; className?: string }) {
+type SkeletonWidth = number | `${number}%` | 'auto'
+
+export function SkeletonBox({ width, height, className = '' }: { width: SkeletonWidth; height: number; className?: string }) {
     const opacity = useRef(new Animated.Value(0.3)).current
+    const shouldUseNativeDriver = Platform.OS !== 'web'
 
     useEffect(() => {
         const animation = Animated.loop(
@@ -10,23 +13,23 @@ export function SkeletonBox({ width, height, className = '' }: { width: number |
                 Animated.timing(opacity, {
                     toValue: 1,
                     duration: 800,
-                    useNativeDriver: true,
+                    useNativeDriver: shouldUseNativeDriver,
                 }),
                 Animated.timing(opacity, {
                     toValue: 0.3,
                     duration: 800,
-                    useNativeDriver: true,
+                    useNativeDriver: shouldUseNativeDriver,
                 }),
             ])
         )
         animation.start()
         return () => animation.stop()
-    }, [opacity])
+    }, [opacity, shouldUseNativeDriver])
 
     return (
         <Animated.View
             style={{
-                width: typeof width === 'string' ? width : width,
+                width,
                 height,
                 opacity,
             }}

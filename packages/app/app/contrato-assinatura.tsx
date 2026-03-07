@@ -36,9 +36,16 @@ export default function ContratoAssinaturaScreen() {
             return
         }
 
-        const data = await fetchDocumentoAluno(id)
-        setDocumento(data)
-        setLoading(false)
+        setLoading(true)
+        try {
+            const data = await fetchDocumentoAluno(id)
+            setDocumento(data)
+        } catch (error) {
+            console.error('[ContratoAssinatura] Erro ao carregar documento:', error)
+            setDocumento(null)
+        } finally {
+            setLoading(false)
+        }
     }, [id])
 
     useEffect(() => {

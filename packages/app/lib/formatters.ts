@@ -5,6 +5,13 @@ export function toBRDate(value?: string | Date | null): string {
     return date.toLocaleDateString('pt-BR')
 }
 
+export function toISODateLocal(date: Date = new Date()): string {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
 export function toBRDateTime(value?: string | Date | null): string {
     if (!value) return '-'
     const date = value instanceof Date ? value : new Date(value)
@@ -63,4 +70,3 @@ export function daysUntil(dateLike?: string | null): number {
 export function monthLabel(date: Date): string {
     return date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '').toUpperCase()
 }
-
