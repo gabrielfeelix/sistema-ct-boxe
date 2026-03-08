@@ -10,28 +10,36 @@ import type { FeedPost, EventoApp } from '@/lib/types'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-// Mapear categoria do evento para imagem e cor
-const EVENTO_CONFIG: Record<string, { image: string; color: string; label: string }> = {
+// Mapear categoria do evento para imagem e tratamento visual
+const EVENTO_CONFIG: Record<string, { image: string; label: string; badgeBg: string; badgeText: string }> = {
     churras: {
         image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
-        color: 'bg-amber-500',
-        label: 'SOCIAL'
+        label: 'SOCIAL',
+        badgeBg: '#F59E0B',
+        badgeText: '#FFFFFF',
     },
     boxe: {
         image: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=400',
-        color: 'bg-red-500',
-        label: 'BOXE'
+        label: 'BOXE',
+        badgeBg: '#DC2626',
+        badgeText: '#FFFFFF',
     },
     social: {
         image: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=400',
-        color: 'bg-blue-500',
-        label: 'SOCIAL'
+        label: 'SOCIAL',
+        badgeBg: '#2563EB',
+        badgeText: '#FFFFFF',
     },
     treino: {
         image: 'https://images.unsplash.com/photo-1517344800993-6773e01049c3?w=400',
-        color: 'bg-emerald-500',
-        label: 'TREINO'
+        label: 'TREINO',
+        badgeBg: '#059669',
+        badgeText: '#FFFFFF',
     }
+}
+
+function getEventoConfig(icone?: string | null) {
+    return EVENTO_CONFIG[icone || 'social'] || EVENTO_CONFIG.social
 }
 
 const FeedPostItem = memo(({ post, onLike, onComment }: {
@@ -39,7 +47,18 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
     onLike: (postId: string) => void
     onComment: (postId: string) => void
 }) => (
-    <View className="mx-6 mb-4 overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+    <View
+        className="mx-6 mb-4 overflow-hidden rounded-[2rem] bg-white"
+        style={{
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 18,
+            elevation: 3,
+        }}
+    >
         <View className="p-5 pb-3">
             <View className="mb-3 flex-row items-center">
                 <View className="mr-3 h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-slate-800">
@@ -139,6 +158,7 @@ export default function FeedScreen() {
     const eventActionScale = useMemo(() => new Animated.Value(1), [])
 
     useEffect(() => {
+        mountedRef.current = true
         return () => {
             mountedRef.current = false
         }
@@ -164,13 +184,18 @@ export default function FeedScreen() {
     }, [aluno?.id])
 
     useEffect(() => {
-        loadData()
+        void loadData()
     }, [loadData])
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true)
-        await loadData()
-        setRefreshing(false)
+        try {
+            await loadData()
+        } finally {
+            if (mountedRef.current) {
+                setRefreshing(false)
+            }
+        }
     }, [loadData])
 
     const handleLike = useCallback(async (postId: string) => {
@@ -194,18 +219,37 @@ export default function FeedScreen() {
             )
         )
 
-        const result = await toggleFeedLike(postId, aluno.id, current.likedByMe)
-        setPosts((prev) =>
-            prev.map((post) =>
-                post.id === postId
-                    ? {
-                        ...post,
-                        likedByMe: result.likedByMe,
-                        curtidas: result.curtidas,
-                    }
-                    : post
+        try {
+            const result = await toggleFeedLike(postId, aluno.id, current.likedByMe)
+            if (!mountedRef.current) return
+
+            setPosts((prev) =>
+                prev.map((post) =>
+                    post.id === postId
+                        ? {
+                            ...post,
+                            likedByMe: result.likedByMe,
+                            curtidas: result.curtidas,
+                        }
+                        : post
+                )
             )
-        )
+        } catch (error) {
+            console.error('[Feed] Erro ao curtir post:', error)
+            if (!mountedRef.current) return
+
+            setPosts((prev) =>
+                prev.map((post) =>
+                    post.id === postId
+                        ? {
+                            ...post,
+                            likedByMe: current.likedByMe,
+                            curtidas: current.curtidas,
+                        }
+                        : post
+                )
+            )
+        }
     }, [aluno?.id, posts])
 
     const handleComment = useCallback((postId: string) => {
@@ -327,7 +371,7 @@ export default function FeedScreen() {
                                     contentContainerStyle={{ paddingRight: 24 }}
                                 >
                                     {eventos.map((evento) => {
-                                        const config = EVENTO_CONFIG[evento.icone || 'social'] || EVENTO_CONFIG.social
+                                        const config = getEventoConfig(evento.icone)
                                         const eventImage = evento.imagem_url || config.image
                                         const dataFormatada = format(parseISO(evento.data_evento), "EEE, dd/MM", { locale: ptBR })
 
@@ -344,7 +388,26 @@ export default function FeedScreen() {
                                                     style={{ width: '100%', height: '100%' }}
                                                     resizeMode="cover"
                                                 />
-                                                <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                                                <View
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: 0,
+                                                        right: 0,
+                                                        bottom: 0,
+                                                        left: 0,
+                                                        backgroundColor: 'rgba(2, 6, 23, 0.34)',
+                                                    }}
+                                                />
+                                                <View
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: 0,
+                                                        bottom: 0,
+                                                        left: 0,
+                                                        height: 92,
+                                                        backgroundColor: 'rgba(2, 6, 23, 0.58)',
+                                                    }}
+                                                />
 
                                                 {evento.destaque && (
                                                     <View className="absolute right-3 top-3 h-6 w-6 items-center justify-center rounded-full bg-amber-400">
@@ -358,14 +421,24 @@ export default function FeedScreen() {
                                                     </View>
                                                 )}
 
-                                                <View className={`absolute left-3 top-3 rounded-lg ${config.color} px-2 py-1`}>
-                                                    <Text className="text-[9px] font-black uppercase tracking-widest text-white">
+                                                <View
+                                                    style={{
+                                                        position: 'absolute',
+                                                        left: 12,
+                                                        top: 12,
+                                                        borderRadius: 10,
+                                                        backgroundColor: config.badgeBg,
+                                                        paddingHorizontal: 8,
+                                                        paddingVertical: 4,
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', letterSpacing: 1.5, color: config.badgeText }}>
                                                         {config.label}
                                                     </Text>
                                                 </View>
 
                                                 <View className="absolute bottom-0 left-0 right-0 p-3">
-                                                    <Text className="mb-2 text-base font-black uppercase tracking-tight text-white line-clamp-2">
+                                                    <Text className="mb-2 text-base font-black uppercase tracking-tight text-white" numberOfLines={2}>
                                                         {evento.titulo}
                                                     </Text>
                                                     <View className="flex-row items-center">
@@ -434,7 +507,7 @@ export default function FeedScreen() {
                                 <View className="relative">
                                     <Image
                                         source={{
-                                            uri: (selectedEvent.imagem_url || (EVENTO_CONFIG[selectedEvent.icone || 'social'] || EVENTO_CONFIG.social).image).replace('w=400', 'w=800'),
+                                            uri: (selectedEvent.imagem_url || getEventoConfig(selectedEvent.icone).image).replace('w=400', 'w=800'),
                                             cache: 'force-cache'
                                         }}
                                         style={{ width: '100%', height: 300 }}
@@ -456,9 +529,20 @@ export default function FeedScreen() {
                                 </View>
 
                                 <View className="px-6 py-6">
-                                    <View className={`mb-4 rounded-lg px-3 py-1.5 self-start ${(EVENTO_CONFIG[selectedEvent.icone || 'social'] || EVENTO_CONFIG.social).color.replace('bg-', 'bg-').replace('-500', '-50')}`}>
-                                        <Text className={`text-[10px] font-black uppercase tracking-widest ${(EVENTO_CONFIG[selectedEvent.icone || 'social'] || EVENTO_CONFIG.social).color.replace('bg-', 'text-').replace('-500', '-700')}`}>
-                                            {(EVENTO_CONFIG[selectedEvent.icone || 'social'] || EVENTO_CONFIG.social).label}
+                                    <View
+                                        style={{
+                                            alignSelf: 'flex-start',
+                                            marginBottom: 16,
+                                            borderRadius: 10,
+                                            borderWidth: 1,
+                                            borderColor: '#E2E8F0',
+                                            backgroundColor: '#F8FAFC',
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 6,
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: getEventoConfig(selectedEvent.icone).badgeBg }}>
+                                            {getEventoConfig(selectedEvent.icone).label}
                                         </Text>
                                     </View>
 
@@ -516,8 +600,7 @@ export default function FeedScreen() {
                                                 if (!aluno?.id) return
                                                 animateEventAction()
                                                 const novoStatus = selectedEvent.status_usuario !== 'confirmado'
-                                                await setConfirmacaoEvento(aluno.id, selectedEvent.id, novoStatus)
-                                                await loadData()
+                                                const previousStatus = selectedEvent.status_usuario
                                                 setSelectedEvent((prev) =>
                                                     prev
                                                         ? {
@@ -527,6 +610,22 @@ export default function FeedScreen() {
                                                         }
                                                         : prev
                                                 )
+                                                try {
+                                                    await setConfirmacaoEvento(aluno.id, selectedEvent.id, novoStatus)
+                                                    await loadData()
+                                                } catch (error) {
+                                                    console.error('[Feed] Erro ao confirmar evento:', error)
+                                                    if (!mountedRef.current) return
+                                                    setSelectedEvent((prev) =>
+                                                        prev
+                                                            ? {
+                                                                ...prev,
+                                                                status_usuario: previousStatus,
+                                                                confirmados: Math.max(prev.confirmados + (novoStatus ? -1 : 1), 0),
+                                                            }
+                                                            : prev
+                                                    )
+                                                }
                                             }}
                                             className={`h-14 flex-row items-center justify-center rounded-2xl shadow-lg ${selectedEvent.status_usuario === 'confirmado'
                                                 ? 'bg-[#22C55E] shadow-emerald-500/30'
@@ -598,7 +697,7 @@ export default function FeedScreen() {
                                 </View>
                             }
                             renderItem={({ item: comment }) => {
-                                const initials = comment.autor.split(' ').map(n => n[0]).join('').slice(0, 2)
+                                const initials = comment.iniciais || comment.autor.split(' ').map(n => n[0]).join('').slice(0, 2)
                                 return (
                                     <View className="border-b border-slate-100/60 px-6 py-4">
                                         <View className="flex-row items-start">
