@@ -1,9 +1,20 @@
 import { Redirect, Tabs } from 'expo-router'
 import type { ReactNode } from 'react'
-import { ActivityIndicator, Platform, View } from 'react-native'
+import { ActivityIndicator, Platform, TouchableOpacity, View } from 'react-native'
 import { FontAwesome5, Feather } from '@expo/vector-icons'
-
 import { useAuth } from '@/contexts/AuthContext'
+
+function AnimatedTabButton({ children, style, ...props }: any) {
+    return (
+        <TouchableOpacity
+            {...props}
+            activeOpacity={0.84}
+            style={style}
+        >
+            {children}
+        </TouchableOpacity>
+    )
+}
 
 export default function TabLayout() {
     const { loading, session } = useAuth()
@@ -73,6 +84,7 @@ export default function TabLayout() {
                     justifyContent: 'center',
                     alignItems: 'center',
                 },
+                tabBarButton: (props) => <AnimatedTabButton {...props} />,
             }}
         >
             <Tabs.Screen

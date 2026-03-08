@@ -26,6 +26,7 @@
       "package": "com.neoespect.ctboxe"
     },
     "web": {
+      "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
@@ -33,6 +34,9 @@
       "expo-font",
       "expo-video"
     ],
+    "experiments": {
+      "autolinkingModuleResolution": true
+    },
     "extra": {
       "router": {},
       "eas": {

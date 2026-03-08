@@ -1,4 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js'
+import { decode } from 'base64-arraybuffer'
+import * as FileSystem from 'expo-file-system'
 
 import { Alert } from 'react-native'
 import { daysUntil, getInitials, monthLabel, toBRDate, toBRDateTime, toBRTime, toISODateLocal } from '@/lib/formatters'
@@ -47,6 +49,16 @@ export interface AgendaData {
     dias: AgendaDaySummary[]
     aulas: AppAula[]
     proximaAula: AppAula | null
+}
+
+export function buildEmptyAgendaData(): AgendaData {
+    return {
+        selectedDateISO: '',
+        selectedLabel: '',
+        dias: [],
+        aulas: [],
+        proximaAula: null,
+    }
 }
 
 export interface HistoricoData {
@@ -152,7 +164,7 @@ function buildNextDays(count: number) {
             date,
             dayNumber: date.getDate(),
             isToday: index === 0,
-            shortLabel: index === 0 ? 'HOJE' : index === 1 ? 'AMANHA' : labels[date.getDay()],
+            shortLabel: index === 0 ? 'HOJE' : labels[date.getDay()],
             label: toBRDate(date),
         }
     })
@@ -791,7 +803,7 @@ export async function setPresencaStatus(
     }
 
     // Se virou check-in (presente), notifica o admin/professor
-if (status === 'presente' && !wasPresente) {
+    if (status === 'presente' && !wasPresente) {
         const { data: aluno } = await supabase.from('alunos').select('nome').eq('id', alunoId).single()
         const { data: aula } = await supabase.from('aulas').select('nome, professor').eq('id', aulaId).single()
 
@@ -833,14 +845,52 @@ export async function fetchAgendaData(alunoId: string, selectedDateISO: string):
         : diasBase
 
     const dateSet = [...new Set(daysToFetch.map((dia) => dia.iso))]
-    const aulasPorDia = await Promise.all(
-        dateSet.map(async (iso) => {
-            const result = await fetchAulasWithPresence(alunoId, iso)
-            return [iso, result.aulas] as const
-        })
-    )
 
-    const aulasMap = Object.fromEntries(aulasPorDia)
+    // Batch: busca todas as aulas de todos os dias em UMA query
+    const aulasQuery = await supabase
+        .from('aulas')
+        .select('*')
+        .in('data', dateSet)
+        .neq('status', 'cancelada')
+        .order('hora_inicio', { ascending: true })
+
+    if (aulasQuery.error) {
+        console.error('[Agenda] Erro ao buscar aulas:', aulasQuery.error.message)
+    }
+
+    const aulasRows = (aulasQuery.data as Record<string, unknown>[]) ?? []
+    const aulaIds = aulasRows.map((row) => String(row.id))
+
+    // Batch: busca todas as presenças em UMA query
+    let presencasRows: PresencaRow[] = []
+    if (aulaIds.length > 0) {
+        const presencasQuery = await supabase
+            .from('presencas')
+            .select('aula_id, aluno_id, status, updated_at, created_at')
+            .in('aula_id', aulaIds)
+
+        if (presencasQuery.error) {
+            console.error('[Agenda] Erro ao buscar presencas:', presencasQuery.error.message)
+        } else {
+            presencasRows = (presencasQuery.data as PresencaRow[]) ?? []
+        }
+    }
+
+    const { ocupacaoByAula, userStatusByAula } = buildPresenceMaps(presencasRows, alunoId)
+
+    // Mapear e agrupar por data
+    const aulasMap: Record<string, AppAula[]> = {}
+    for (const row of aulasRows) {
+        const id = String(row.id)
+        const dataISO = String(row.data ?? '')
+        const mapped = mapAula(row, ocupacaoByAula[id] ?? 0)
+        const userStatus = userStatusByAula[id]
+        const decorated = decorateAulaWithConfirmation(mapped, userStatus)
+
+        if (!aulasMap[dataISO]) aulasMap[dataISO] = []
+        aulasMap[dataISO].push(decorated)
+    }
+
     const selectedAulas = aulasMap[requestedDate] ?? []
     const proximaAula = await getProximaAula(alunoId)
 
@@ -868,6 +918,7 @@ export async function fetchFeedData(alunoId: string): Promise<FeedPost[]> {
         .select('*')
         .eq('publicado', true)
         .order('created_at', { ascending: false })
+        .limit(50)
 
     const postRows = (postsRes.data as Record<string, unknown>[]) ?? []
     const postIds = postRows.map((post) => String(post.id))
@@ -1262,23 +1313,23 @@ export async function fetchNotificacoes(alunoId: string): Promise<HomeNotificati
             return audience !== 'gestao' && audience !== 'professor'
         })
         .map((row) => ({
-        id: String(row.id),
-        tipo: String(row.tipo ?? 'ct'),
-        titulo: String(row.titulo ?? 'Notificacao'),
-        subtitulo: String(row.subtitulo ?? row.mensagem ?? ''),
-        mensagem: (row.mensagem as string) ?? null,
-        horario: toRelativeTime(row.created_at as string),
-        lida: Boolean(row.lida),
-        acao: (row.acao as string) ?? null,
-        link: (row.link as string) ?? null,
-        actionLabel: mapNotificationActionLabel(
-            String(row.tipo ?? 'ct'),
-            (row.acao as string) ?? null
-        ),
-        created_at: (row.created_at as string) ?? null,
-        icone: (row.icone as string) ?? null,
-        audiencia: (row.audiencia as string) ?? 'aluno',
-    }))
+            id: String(row.id),
+            tipo: String(row.tipo ?? 'ct'),
+            titulo: String(row.titulo ?? 'Notificacao'),
+            subtitulo: String(row.subtitulo ?? row.mensagem ?? ''),
+            mensagem: (row.mensagem as string) ?? null,
+            horario: toRelativeTime(row.created_at as string),
+            lida: Boolean(row.lida),
+            acao: (row.acao as string) ?? null,
+            link: (row.link as string) ?? null,
+            actionLabel: mapNotificationActionLabel(
+                String(row.tipo ?? 'ct'),
+                (row.acao as string) ?? null
+            ),
+            created_at: (row.created_at as string) ?? null,
+            icone: (row.icone as string) ?? null,
+            audiencia: (row.audiencia as string) ?? 'aluno',
+        }))
 }
 
 export async function markNotificacaoLida(id: string) {
@@ -1470,21 +1521,35 @@ export async function updateAlunoDados(alunoId: string, payload: Partial<AlunoPr
 }
 
 export async function uploadFotoPerfil(alunoId: string, imageUri: string): Promise<string> {
-    // Use fetch to read the file as blob (new recommended approach)
-    const response = await fetch(imageUri)
-    const blob = await response.blob()
+    const extensionFromUri = imageUri.split('.').pop()?.toLowerCase() ?? 'jpg'
+    const ext = extensionFromUri === 'jpeg' ? 'jpg' : extensionFromUri
+    const contentTypeMap: Record<string, string> = {
+        jpg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        heic: 'image/heic',
+    }
 
-    const ext = imageUri.split('.').pop() || 'jpg'
-    const filePath = `${alunoId}/${new Date().getTime()}.${ext}`
+    const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: ((FileSystem as unknown as { EncodingType?: { Base64?: string } }).EncodingType?.Base64 ??
+            'base64') as never,
+    })
 
-    const { error } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, blob, { contentType: `image/${ext}`, upsert: true })
+    const filePath = `${alunoId}/${Date.now()}.${ext}`
+    const fileBuffer = decode(base64)
 
-    if (error) throw error
+    const { error } = await supabase.storage.from('avatars').upload(filePath, fileBuffer, {
+        contentType: contentTypeMap[ext] ?? 'image/jpeg',
+        upsert: true,
+    })
+
+    if (error) {
+        console.error('[Perfil] Erro ao subir avatar:', error.message)
+        throw error
+    }
 
     const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
-    const fotoUrl = publicUrlData.publicUrl
+    const fotoUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`
 
     await supabase.from('alunos').update({ foto_url: fotoUrl }).eq('id', alunoId)
     return fotoUrl

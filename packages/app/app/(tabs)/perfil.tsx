@@ -1,7 +1,8 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Linking, RefreshControl, ScrollView, Text, TouchableOpacity, View, Image } from 'react-native'
+import { Alert, Animated, Linking, RefreshControl, ScrollView, Text, TouchableOpacity, View, Image } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchPerfilData, type PerfilData } from '@/lib/appData'
@@ -23,9 +24,11 @@ function emptyPerfilData(): PerfilData {
 export default function PerfilScreen() {
     const router = useRouter()
     const { aluno, signOut } = useAuth()
+    const insets = useSafeAreaInsets()
     const [perfil, setPerfil] = useState<PerfilData>(emptyPerfilData)
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
+    const avatarScale = useMemo(() => new Animated.Value(1), [])
 
     const loadData = useCallback(async () => {
         if (!aluno?.id) {
@@ -40,10 +43,10 @@ export default function PerfilScreen() {
         } finally {
             setLoading(false)
         }
-    }, [aluno?.id])
+    }, [aluno?.email, aluno?.foto_url, aluno?.id, aluno?.nome])
 
     useEffect(() => {
-        loadData()
+        void loadData()
     }, [loadData])
 
     const onRefresh = useCallback(async () => {
@@ -87,6 +90,13 @@ export default function PerfilScreen() {
         [alunoData?.nome]
     )
 
+    const animateAvatar = () => {
+        Animated.sequence([
+            Animated.timing(avatarScale, { toValue: 0.96, duration: 90, useNativeDriver: true }),
+            Animated.timing(avatarScale, { toValue: 1, duration: 150, useNativeDriver: true }),
+        ]).start()
+    }
+
     return (
         <View className="flex-1 bg-[#FDFDFD]">
             <ScrollView
@@ -94,7 +104,7 @@ export default function PerfilScreen() {
                 contentContainerStyle={{ paddingBottom: 120 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-                <View className="relative overflow-hidden bg-slate-900 px-6 pb-32 pt-16 shadow-2xl">
+                <View className="relative overflow-hidden bg-slate-900 px-6 pb-32 shadow-2xl" style={{ paddingTop: insets.top + 16 }}>
                     <View className="absolute top-0 right-0 h-full w-full items-center justify-center opacity-5">
                         <FontAwesome5 name="fire" size={240} color="#FFFFFF" />
                     </View>
@@ -102,13 +112,24 @@ export default function PerfilScreen() {
 
                 <View className="-mt-24 z-10 px-6">
                     <View className="mb-10 items-center">
-                        <View className="mb-6 h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-[#FDFDFD] bg-white shadow-xl shadow-slate-900/10">
-                            {alunoData?.foto_url ? (
-                                <Image source={{ uri: alunoData.foto_url }} className="h-full w-full" />
-                            ) : (
-                                <Text className="text-5xl font-black tracking-tighter text-slate-900">{avatarLabel}</Text>
-                            )}
-                        </View>
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => {
+                                animateAvatar()
+                                router.push('/dados-cadastrais')
+                            }}
+                        >
+                            <Animated.View
+                                style={{ transform: [{ scale: avatarScale }] }}
+                                className="mb-6 h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-[#FDFDFD] bg-white shadow-xl shadow-slate-900/10"
+                            >
+                                {alunoData?.foto_url ? (
+                                    <Image source={{ uri: alunoData.foto_url }} className="h-full w-full" />
+                                ) : (
+                                    <Text className="text-5xl font-black tracking-tighter text-slate-900">{avatarLabel}</Text>
+                                )}
+                            </Animated.View>
+                        </TouchableOpacity>
                         <Text className="mb-3 text-3xl font-black tracking-tight text-slate-900">
                             {alunoData?.nome ?? 'Aluno'}
                         </Text>

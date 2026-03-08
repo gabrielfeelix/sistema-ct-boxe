@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Animated, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchAulaDetalhe, getAulaConfirmationInfo, setPresencaStatus, type AulaDetalhe } from '@/lib/appData'
@@ -14,6 +14,7 @@ export default function AulaDetailModal() {
     const [aula, setAula] = useState<AulaDetalhe | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const actionScale = useMemo(() => new Animated.Value(1), [])
 
     const loadData = useCallback(async () => {
         if (!aluno?.id || !id) {
@@ -72,6 +73,10 @@ export default function AulaDetailModal() {
 
         setSaving(true)
         try {
+            Animated.sequence([
+                Animated.timing(actionScale, { toValue: 0.96, duration: 90, useNativeDriver: true }),
+                Animated.spring(actionScale, { toValue: 1, tension: 180, friction: 10, useNativeDriver: true }),
+            ]).start()
             await setPresencaStatus(aluno.id, aula.id, isAgendado ? 'cancelada' : 'agendado')
             await loadData()
         } catch (error) {
@@ -212,28 +217,37 @@ export default function AulaDetailModal() {
                                     )}
                                 </View>
 
-                                <TouchableOpacity
-                                    activeOpacity={0.8}
-                                    disabled={!buttonEnabled}
-                                    onPress={handleAction}
-                                    className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${buttonEnabled
-                                        ? isAgendado
-                                            ? 'border border-red-200 bg-red-50 shadow-red-900/10'
-                                            : 'bg-slate-900 shadow-slate-900/30'
-                                        : 'border border-slate-200 bg-slate-100'
-                                        }`}
-                                >
-                                    <Text
-                                        className={`text-base font-black uppercase tracking-widest ${buttonEnabled
+                                <Animated.View style={{ transform: [{ scale: actionScale }] }}>
+                                    <TouchableOpacity
+                                        activeOpacity={0.86}
+                                        disabled={!buttonEnabled}
+                                        onPress={handleAction}
+                                        className={`h-16 flex-row items-center justify-center rounded-2xl shadow-lg ${buttonEnabled
                                             ? isAgendado
-                                                ? 'text-red-700'
-                                                : 'text-white'
-                                            : 'text-slate-400'
+                                                ? 'bg-[#22C55E] shadow-emerald-500/30'
+                                                : 'bg-slate-900 shadow-slate-900/30'
+                                            : 'border border-slate-200 bg-slate-100'
                                             }`}
                                     >
-                                        {buttonLabel}
-                                    </Text>
-                                </TouchableOpacity>
+                                        {isAgendado && buttonEnabled ? (
+                                            <>
+                                                <Feather name="check" size={18} color="#FFFFFF" />
+                                                <Text className="ml-2 text-base font-black uppercase tracking-widest text-white">
+                                                    PRESENCA CONFIRMADA
+                                                </Text>
+                                            </>
+                                        ) : (
+                                            <Text
+                                                className={`text-base font-black uppercase tracking-widest ${buttonEnabled
+                                                    ? 'text-white'
+                                                    : 'text-slate-400'
+                                                    }`}
+                                            >
+                                                {buttonLabel}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </Animated.View>
                             </>
                         )}
                     </View>

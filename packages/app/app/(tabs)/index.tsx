@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+﻿import { Feather } from '@expo/vector-icons'
 import { router, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -6,17 +6,21 @@ import {
     Alert,
     Image,
     Linking,
+    Pressable,
+    RefreshControl,
     ScrollView,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import BottomSheetModal from '@/components/BottomSheetModal'
 import NotificationIcon, { resolveNotificationIcon } from '@/components/NotificationIcon'
 import StoryViewer from '@/components/StoryViewer'
 import { useAuth } from '@/contexts/AuthContext'
 import {
+    buildEmptyAgendaData,
     fetchAgendaData,
     fetchHomeData,
     fetchNotificacoes,
@@ -39,19 +43,21 @@ function buildEmptyHomeData(): HomeData {
     }
 }
 
-function buildEmptyAgendaData(): AgendaData {
-    return {
-        selectedDateISO: '',
-        selectedLabel: '',
-        dias: [],
-        aulas: [],
-        proximaAula: null,
-    }
+function getAulaDayBadge(dataISO?: string | null) {
+    if (!dataISO) return ''
+    const target = new Date(`${dataISO}T12:00:00`)
+    const today = new Date()
+    const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    const startTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+    const diffDays = Math.round((startTarget.getTime() - startToday.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) return 'HOJE'
+    return target.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase()
 }
 
 export default function HomeScreen() {
     const appRouter = useRouter()
     const { aluno } = useAuth()
+    const insets = useSafeAreaInsets()
     const [homeData, setHomeData] = useState<HomeData>(buildEmptyHomeData)
     const [loading, setLoading] = useState(true)
     const [savingNextClass, setSavingNextClass] = useState(false)
@@ -63,6 +69,7 @@ export default function HomeScreen() {
     const [agendaVisible, setAgendaVisible] = useState(false)
     const [agendaData, setAgendaData] = useState<AgendaData>(buildEmptyAgendaData)
     const [agendaLoading, setAgendaLoading] = useState(false)
+    const [refreshing, setRefreshing] = useState(false)
 
     const loadHome = useCallback(async () => {
         if (!aluno?.id) {
@@ -123,6 +130,12 @@ export default function HomeScreen() {
         setAgendaVisible(true)
         await loadAgenda()
     }, [loadAgenda])
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true)
+        await loadHome()
+        setRefreshing(false)
+    }, [loadHome])
 
     const handleNextClass = useCallback(async () => {
         if (!aluno?.id || !homeData.proximaAula || savingNextClass) return
@@ -198,6 +211,7 @@ export default function HomeScreen() {
 
     const selectedStoryVideos = selectedStory?.videos ?? []
     const unreadNotifications = useMemo(() => notifications.filter((item) => !item.lida).length, [notifications])
+    const proximaAula = homeData.proximaAula
 
     return (
         <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
@@ -213,7 +227,11 @@ export default function HomeScreen() {
                 />
             ) : null}
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 120 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            >
                 <View
                     style={{
                         borderBottomWidth: 1,
@@ -221,13 +239,14 @@ export default function HomeScreen() {
                         backgroundColor: '#FFFFFF',
                         paddingBottom: 24,
                         paddingHorizontal: 24,
-                        paddingTop: 56,
+                        paddingTop: insets.top + 12,
                     }}
                 >
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View
-                                style={{
+                            <Pressable
+                                onPress={() => appRouter.push('/dados-cadastrais')}
+                                style={({ pressed }) => ({
                                     marginRight: 16,
                                     height: 50,
                                     width: 50,
@@ -236,11 +255,12 @@ export default function HomeScreen() {
                                     overflow: 'hidden',
                                     borderRadius: 25,
                                     backgroundColor: '#E2E8F0',
-                                }}
+                                    transform: [{ scale: pressed ? 0.96 : 1 }],
+                                })}
                             >
                                 {aluno?.foto_url ? (
                                     <Image
-                                        source={{ uri: aluno.foto_url, cache: 'force-cache' }}
+                                        source={{ uri: aluno.foto_url }}
                                         style={{ height: '100%', width: '100%' }}
                                         resizeMode="cover"
                                     />
@@ -249,8 +269,13 @@ export default function HomeScreen() {
                                         {getInitials(aluno?.nome ?? 'Atleta')}
                                     </Text>
                                 )}
-                            </View>
-                            <View>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => appRouter.push('/dados-cadastrais')}
+                                style={({ pressed }) => ({
+                                    transform: [{ scale: pressed ? 0.985 : 1 }],
+                                })}
+                            >
                                 <Text
                                     style={{
                                         fontSize: 12,
@@ -265,20 +290,20 @@ export default function HomeScreen() {
                                 <Text style={{ marginTop: 4, fontSize: 22, fontWeight: '900', color: '#0F172A' }}>
                                     {(aluno?.nome ?? 'Atleta').split(' ')[0]}.
                                 </Text>
-                            </View>
+                            </Pressable>
                         </View>
 
-                        <TouchableOpacity
-                            activeOpacity={0.85}
+                        <Pressable
                             onPress={() => void openNotifications()}
-                            style={{
+                            style={({ pressed }) => ({
                                 height: 52,
                                 width: 52,
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 borderRadius: 26,
                                 backgroundColor: '#F8FAFC',
-                            }}
+                                transform: [{ scale: pressed ? 0.94 : 1 }],
+                            })}
                         >
                             <Feather name="bell" size={20} color="#0F172A" />
                             {homeData.notificacoesNaoLidas > 0 ? (
@@ -294,7 +319,7 @@ export default function HomeScreen() {
                                     }}
                                 />
                             ) : null}
-                        </TouchableOpacity>
+                        </Pressable>
                     </View>
                 </View>
 
@@ -392,7 +417,7 @@ export default function HomeScreen() {
                 </View>
 
                 <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
-                    {homeData.proximaAula ? (
+                    {proximaAula ? (
                         <View style={{ overflow: 'hidden', borderRadius: 30, backgroundColor: '#08112B' }}>
                             <View
                                 style={{
@@ -406,7 +431,7 @@ export default function HomeScreen() {
                                 }}
                             >
                                 <Text style={{ fontSize: 18, fontWeight: '900', color: '#FFFFFF' }}>
-                                    {homeData.proximaAula.horario}
+                                    {proximaAula.horario}
                                 </Text>
                             </View>
 
@@ -424,51 +449,59 @@ export default function HomeScreen() {
                                     Proxima aula
                                 </Text>
                                 <Text style={{ fontSize: 30, fontWeight: '900', color: '#FFFFFF' }}>
-                                    {homeData.proximaAula.nome.toUpperCase()}
+                                    {proximaAula.nome.toUpperCase()}
                                 </Text>
                                 <Text style={{ marginTop: 8, fontSize: 15, fontWeight: '600', color: '#CBD5E1' }}>
-                                    {homeData.proximaAula.professor}
+                                    {proximaAula.professor}
+                                </Text>
+                                <Text style={{ marginTop: 6, fontSize: 12, fontWeight: '800', color: '#94A3B8' }}>
+                                    {getAulaDayBadge(proximaAula.dataISO)} • {proximaAula.data}
                                 </Text>
                                 <Text style={{ marginTop: 6, fontSize: 12, color: '#94A3B8' }}>
-                                    {homeData.proximaAula.vagas_ocupadas}/{homeData.proximaAula.vagas_total} alunos
+                                    {proximaAula.vagas_ocupadas}/{proximaAula.vagas_total} alunos
                                 </Text>
 
-                                <TouchableOpacity
-                                    activeOpacity={0.85}
+                                <Pressable
                                     disabled={savingNextClass}
                                     onPress={() => void handleNextClass()}
-                                    style={{
+                                    style={({ pressed }) => ({
                                         marginTop: 22,
                                         borderRadius: 18,
                                         backgroundColor:
-                                            homeData.proximaAula.agendado || homeData.proximaAula.presente
-                                                ? '#172036'
-                                                : homeData.proximaAula.presenceActionEnabled
+                                            proximaAula.agendado || proximaAula.presente
+                                                ? '#22C55E'
+                                                : proximaAula.presenceActionEnabled
                                                     ? '#DC2626'
                                                     : '#334155',
                                         paddingVertical: 16,
                                         alignItems: 'center',
-                                    }}
+                                        transform: [{ scale: pressed && !savingNextClass ? 0.985 : 1 }],
+                                    })}
                                 >
                                     {savingNextClass ? (
                                         <ActivityIndicator color="#FFFFFF" />
                                     ) : (
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                fontWeight: '900',
-                                                letterSpacing: 1.4,
-                                                color: '#FFFFFF',
-                                                textTransform: 'uppercase',
-                                            }}
-                                        >
-                                            {homeData.proximaAula.presenceActionLabel ??
-                                                (homeData.proximaAula.agendado || homeData.proximaAula.presente
-                                                    ? 'Cancelar presenca'
-                                                    : 'Confirmar presenca')}
-                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                            {proximaAula.agendado || proximaAula.presente ? (
+                                                <Feather name="check" size={16} color="#FFFFFF" />
+                                            ) : null}
+                                            <Text
+                                                style={{
+                                                    marginLeft: proximaAula.agendado || proximaAula.presente ? 8 : 0,
+                                                    fontSize: 12,
+                                                    fontWeight: '900',
+                                                    letterSpacing: 1.4,
+                                                    color: '#FFFFFF',
+                                                    textTransform: 'uppercase',
+                                                }}
+                                            >
+                                                {proximaAula.agendado || proximaAula.presente
+                                                    ? 'Presenca confirmada'
+                                                    : proximaAula.presenceActionLabel ?? 'Confirmar presenca'}
+                                            </Text>
+                                        </View>
                                     )}
-                                </TouchableOpacity>
+                                </Pressable>
                             </View>
                         </View>
                     ) : loading ? (
@@ -510,19 +543,18 @@ export default function HomeScreen() {
 
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         {homeData.proximasAulas.map((aula) => (
-                            <TouchableOpacity
+                            <Pressable
                                 key={aula.id}
-                                activeOpacity={0.88}
                                 onPress={() => appRouter.push(`/aula/${aula.id}`)}
-                                style={{
+                                style={({ pressed }) => ({
                                     marginRight: 14,
                                     width: 244,
                                     borderRadius: 24,
-                                    borderWidth: 1,
-                                    borderColor: '#E2E8F0',
-                                    backgroundColor: '#FFFFFF',
+                                    borderWidth: 1.5,
+                                    borderColor: pressed ? '#F87171' : '#E2E8F0',
+                                    backgroundColor: pressed ? '#FFF5F5' : '#FFFFFF',
                                     padding: 18,
-                                }}
+                                })}
                             >
                                 <Text style={{ fontSize: 28, fontWeight: '900', color: '#0F172A' }}>
                                     {aula.horario}
@@ -534,9 +566,9 @@ export default function HomeScreen() {
                                     {aula.professor}
                                 </Text>
                                 <Text style={{ marginTop: 14, fontSize: 12, fontWeight: '700', color: '#94A3B8' }}>
-                                    {aula.data} • {aula.vagas_ocupadas}/{aula.vagas_total}
+                                    {aula.data} â€¢ {aula.vagas_ocupadas}/{aula.vagas_total}
                                 </Text>
-                            </TouchableOpacity>
+                            </Pressable>
                         ))}
                     </ScrollView>
                 </View>

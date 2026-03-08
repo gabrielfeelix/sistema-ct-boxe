@@ -1,6 +1,7 @@
-import { Feather, FontAwesome5 } from '@expo/vector-icons'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { FlatList, Modal, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View, Image, Keyboard } from 'react-native'
+﻿import { Feather, FontAwesome5 } from '@expo/vector-icons'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Animated, FlatList, Modal, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View, Image, Keyboard } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { FeedPostSkeleton } from '@/components/SkeletonLoader'
 import { useAuth } from '@/contexts/AuthContext'
@@ -38,10 +39,10 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
     onLike: (postId: string) => void
     onComment: (postId: string) => void
 }) => (
-    <View className="mx-6 mb-4 overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-sm">
-        <View className="p-4 pb-3">
+    <View className="mx-6 mb-4 overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+        <View className="p-5 pb-3">
             <View className="mb-3 flex-row items-center">
-                <View className="mr-3 h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-800">
+                <View className="mr-3 h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-slate-800">
                     <Text className="text-sm font-black tracking-tighter text-white">
                         {post.iniciais}
                     </Text>
@@ -50,20 +51,23 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
                     <Text className="text-[15px] font-bold tracking-tight text-slate-900">
                         {post.autor}
                     </Text>
-                    <Text className="text-[10px] font-medium text-slate-400">
+                    <Text className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                         {post.data}
                     </Text>
                 </View>
+                <View className="h-8 w-8 items-center justify-center rounded-full">
+                    <Feather name="share-2" size={16} color="#94A3B8" />
+                </View>
             </View>
 
-            <Text className="mb-3 text-[15px] font-medium leading-relaxed text-slate-700">
+            <Text className="mb-4 text-[16px] font-medium leading-8 text-slate-800">
                 {post.texto}
             </Text>
         </View>
 
         {post.imagem ? (
-            <View className="mb-3 overflow-hidden px-4">
-                <View className="overflow-hidden rounded-2xl">
+            <View className="mb-4 overflow-hidden px-5">
+                <View className="overflow-hidden rounded-[1.4rem]">
                     <Image
                         source={{ uri: post.imagem, cache: 'force-cache' }}
                         style={{ width: '100%', height: 220 }}
@@ -73,25 +77,20 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
             </View>
         ) : null}
 
-        <View className="flex-row items-center border-t border-slate-100/80 px-4 py-2.5">
+        <View className="mx-5 flex-row items-center border-t border-slate-200/80 py-3">
             <TouchableOpacity
                 activeOpacity={0.6}
                 onPress={() => onLike(post.id)}
                 className="mr-6 flex-row items-center"
             >
-                <View
-                    className={`mr-2 h-8 w-8 items-center justify-center rounded-full ${post.likedByMe ? 'bg-red-50' : 'bg-slate-50'
-                        }`}
-                >
-                    <FontAwesome5
-                        name="fire"
-                        size={14}
-                        color={post.likedByMe ? '#CC0000' : '#94A3B8'}
-                        solid={post.likedByMe}
-                    />
-                </View>
+                <FontAwesome5
+                    name="heart"
+                    size={15}
+                    color={post.likedByMe ? '#CC0000' : '#64748B'}
+                    solid={post.likedByMe}
+                />
                 <Text
-                    className={`text-sm font-bold ${post.likedByMe ? 'text-[#CC0000]' : 'text-slate-600'
+                    className={`ml-2 text-sm font-bold ${post.likedByMe ? 'text-[#CC0000]' : 'text-slate-600'
                         }`}
                 >
                     {post.curtidas}
@@ -103,17 +102,15 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
                 onPress={() => onComment(post.id)}
                 className="flex-row items-center"
             >
-                <View className="mr-2 h-8 w-8 items-center justify-center rounded-full bg-slate-50">
-                    <Feather name="message-circle" size={14} color="#64748B" />
-                </View>
-                <Text className="text-sm font-bold text-slate-600">
+                <Feather name="message-circle" size={15} color="#64748B" />
+                <Text className="ml-2 text-sm font-bold text-slate-600">
                     {post.comentarios.length}
                 </Text>
             </TouchableOpacity>
         </View>
 
         {post.comentarios.length > 0 && (
-            <View className="border-t border-slate-100/80 bg-slate-50/40 px-4 py-3">
+            <View className="border-t border-slate-100/80 bg-slate-50/40 px-5 py-3">
                 <View className="flex-row items-start">
                     <Text className="mr-2 text-xs font-bold text-slate-900">
                         {post.comentarios[0].autor}
@@ -129,6 +126,7 @@ const FeedPostItem = memo(({ post, onLike, onComment }: {
 
 export default function FeedScreen() {
     const { aluno } = useAuth()
+    const insets = useSafeAreaInsets()
     const [posts, setPosts] = useState<FeedPost[]>([])
     const [eventos, setEventos] = useState<EventoApp[]>([])
     const [loading, setLoading] = useState(true)
@@ -138,6 +136,7 @@ export default function FeedScreen() {
     const [commentText, setCommentText] = useState('')
     const [sendingComment, setSendingComment] = useState(false)
     const mountedRef = useRef(true)
+    const eventActionScale = useMemo(() => new Animated.Value(1), [])
 
     useEffect(() => {
         return () => {
@@ -295,9 +294,16 @@ export default function FeedScreen() {
         }
     }, [aluno?.id, aluno?.nome, selectedPostForComments, commentText, sendingComment])
 
+    const animateEventAction = useCallback(() => {
+        Animated.sequence([
+            Animated.timing(eventActionScale, { toValue: 0.96, duration: 90, useNativeDriver: true }),
+            Animated.spring(eventActionScale, { toValue: 1, tension: 180, friction: 10, useNativeDriver: true }),
+        ]).start()
+    }, [eventActionScale])
+
     return (
         <View className="flex-1 bg-[#FDFDFD]">
-            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 pt-12 shadow-sm shadow-slate-200/50">
+            <View className="z-10 border-b border-slate-100 bg-white px-6 pb-6 shadow-sm shadow-slate-200/50" style={{ paddingTop: insets.top + 12 }}>
                 <Text className="mb-2 text-4xl font-black tracking-tight text-slate-900">COMUNIDADE</Text>
                 <Text className="text-sm font-medium text-slate-500">Eventos, resenhas e evolução.</Text>
             </View>
@@ -343,6 +349,12 @@ export default function FeedScreen() {
                                                 {evento.destaque && (
                                                     <View className="absolute right-3 top-3 h-6 w-6 items-center justify-center rounded-full bg-amber-400">
                                                         <Feather name="star" size={12} color="#FFFFFF" />
+                                                    </View>
+                                                )}
+
+                                                {evento.status_usuario === 'confirmado' && (
+                                                    <View className="absolute right-12 top-3 h-6 min-w-6 flex-row items-center justify-center rounded-full bg-emerald-500 px-2">
+                                                        <Feather name="check" size={11} color="#FFFFFF" />
                                                     </View>
                                                 )}
 
@@ -497,29 +509,44 @@ export default function FeedScreen() {
                                         </Text>
                                     </View>
 
-                                    <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        onPress={async () => {
-                                            if (!aluno?.id) return
-                                            const novoStatus = selectedEvent.status_usuario !== 'confirmado'
-                                            await setConfirmacaoEvento(aluno.id, selectedEvent.id, novoStatus)
-                                            await loadData()
-                                            setSelectedEvent(null)
-                                        }}
-                                        className={`h-14 items-center justify-center rounded-2xl shadow-lg ${
-                                            selectedEvent.status_usuario === 'confirmado'
-                                                ? 'border-2 border-slate-200 bg-slate-100'
+                                    <Animated.View style={{ transform: [{ scale: eventActionScale }] }}>
+                                        <TouchableOpacity
+                                            activeOpacity={0.86}
+                                            onPress={async () => {
+                                                if (!aluno?.id) return
+                                                animateEventAction()
+                                                const novoStatus = selectedEvent.status_usuario !== 'confirmado'
+                                                await setConfirmacaoEvento(aluno.id, selectedEvent.id, novoStatus)
+                                                await loadData()
+                                                setSelectedEvent((prev) =>
+                                                    prev
+                                                        ? {
+                                                            ...prev,
+                                                            status_usuario: novoStatus ? 'confirmado' : 'pendente',
+                                                            confirmados: Math.max(prev.confirmados + (novoStatus ? 1 : -1), 0),
+                                                        }
+                                                        : prev
+                                                )
+                                            }}
+                                            className={`h-14 flex-row items-center justify-center rounded-2xl shadow-lg ${selectedEvent.status_usuario === 'confirmado'
+                                                ? 'bg-[#22C55E] shadow-emerald-500/30'
                                                 : 'bg-[#CC0000] shadow-red-900/30'
-                                        }`}
-                                    >
-                                        <Text className={`text-base font-black uppercase tracking-widest ${
-                                            selectedEvent.status_usuario === 'confirmado'
-                                                ? 'text-slate-600'
-                                                : 'text-white'
-                                        }`}>
-                                            {selectedEvent.status_usuario === 'confirmado' ? 'CANCELAR PRESENÇA' : 'CONFIRMAR PRESENÇA'}
-                                        </Text>
-                                    </TouchableOpacity>
+                                                }`}
+                                        >
+                                            {selectedEvent.status_usuario === 'confirmado' ? (
+                                                <>
+                                                    <Feather name="check" size={18} color="#FFFFFF" />
+                                                    <Text className="ml-2 text-base font-black uppercase tracking-widest text-white">
+                                                        PRESENÇA CONFIRMADA
+                                                    </Text>
+                                                </>
+                                            ) : (
+                                                <Text className="text-base font-black uppercase tracking-widest text-white">
+                                                    CONFIRMAR PRESENÇA
+                                                </Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </Animated.View>
                                 </View>
                             </ScrollView>
                         </View>
@@ -586,7 +613,7 @@ export default function FeedScreen() {
                                                         {comment.autor}
                                                     </Text>
                                                     <Text className="text-xs text-slate-400">
-                                                        há 2h
+                                                        {comment.data}
                                                     </Text>
                                                 </View>
                                                 <Text className="text-sm leading-relaxed text-slate-600">

@@ -1,4 +1,4 @@
-import { Children, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Animated, Platform, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Feather, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -206,14 +206,14 @@ export default function EventosScreen() {
                             <Text className="text-sm font-medium text-slate-500">Carregando eventos...</Text>
                         </View>
                     ) : eventosFiltrados.length > 0 ? (
-                        Children.toArray(
-                            eventosFiltrados.map((evento) => {
+                        eventosFiltrados.map((evento) => {
                                 const isConfirmado = evento.status_usuario === 'confirmado'
                                 const scale = getAnimValue(evento.id)
                                 const isPast = new Date(evento.data_evento) < startOfToday()
 
                                 return (
                                     <View
+                                        key={evento.id}
                                         className={`mb-5 rounded-3xl border p-5 shadow-sm ${
                                             isPast
                                                 ? 'border-slate-200 bg-slate-50 opacity-60'
@@ -263,6 +263,14 @@ export default function EventosScreen() {
                                                     >
                                                         {evento.titulo}
                                                     </Text>
+                                                    {isConfirmado ? (
+                                                        <View className="mt-2 flex-row items-center self-start rounded-full bg-emerald-100 px-2.5 py-1">
+                                                            <Feather name="check" size={11} color="#059669" />
+                                                            <Text className="ml-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                                                                Confirmado
+                                                            </Text>
+                                                        </View>
+                                                    ) : null}
                                                 </View>
                                             </View>
                                         </View>
@@ -373,7 +381,6 @@ export default function EventosScreen() {
                                     </View>
                                 )
                             })
-                        )
                     ) : (
                         <View className="items-center justify-center rounded-3xl border border-dashed border-slate-100 bg-white py-16">
                             <View className="mb-6 h-20 w-20 items-center justify-center rounded-full bg-slate-50">

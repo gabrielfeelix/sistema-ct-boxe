@@ -3,25 +3,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     ActivityIndicator,
     Alert,
+    Pressable,
     ScrollView,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import BottomSheetModal from '@/components/BottomSheetModal'
 import { useAuth } from '@/contexts/AuthContext'
-import { fetchAgendaData, setPresencaStatus, type AgendaData } from '@/lib/appData'
-
-function buildEmptyAgendaData(): AgendaData {
-    return {
-        selectedDateISO: '',
-        selectedLabel: '',
-        dias: [],
-        aulas: [],
-        proximaAula: null,
-    }
-}
+import { buildEmptyAgendaData, fetchAgendaData, setPresencaStatus, type AgendaData } from '@/lib/appData'
 
 function buildMonthDays(baseDateISO: string) {
     const baseDate = baseDateISO ? new Date(`${baseDateISO}T12:00:00`) : new Date()
@@ -52,6 +44,7 @@ function buildMonthDays(baseDateISO: string) {
 
 export default function CheckinScreen() {
     const { aluno } = useAuth()
+    const insets = useSafeAreaInsets()
     const [agendaData, setAgendaData] = useState<AgendaData>(buildEmptyAgendaData)
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
@@ -132,7 +125,7 @@ export default function CheckinScreen() {
                     paddingBottom: 24,
                     paddingLeft: 24,
                     paddingRight: 24,
-                    paddingTop: 54,
+                    paddingTop: insets.top + 12,
                 }}
             >
                 <View
@@ -193,17 +186,16 @@ export default function CheckinScreen() {
                     {agendaData.dias.map((dia) => {
                         const active = dia.iso === agendaData.selectedDateISO
                         return (
-                            <TouchableOpacity
+                            <Pressable
                                 key={dia.iso}
-                                activeOpacity={0.85}
                                 onPress={() => handleSelectDay(dia.iso)}
-                                style={{
+                                style={({ pressed }) => ({
                                     marginRight: 12,
                                     width: 80,
                                     borderRadius: 22,
                                     borderWidth: 1,
-                                    borderColor: active ? '#DC2626' : '#CBD5E1',
-                                    backgroundColor: active ? '#DC2626' : '#FFFFFF',
+                                    borderColor: active ? '#DC2626' : pressed ? '#F87171' : '#CBD5E1',
+                                    backgroundColor: active ? '#DC2626' : pressed ? '#FEF2F2' : '#FFFFFF',
                                     paddingVertical: 14,
                                     paddingHorizontal: 12,
                                     shadowColor: active ? '#DC2626' : '#000000',
@@ -211,7 +203,7 @@ export default function CheckinScreen() {
                                     shadowOpacity: active ? 0.18 : 0,
                                     shadowRadius: 18,
                                     elevation: active ? 5 : 0,
-                                }}
+                                })}
                             >
                                 <Text
                                     style={{
@@ -250,7 +242,7 @@ export default function CheckinScreen() {
                                 ) : (
                                     <View style={{ marginTop: 12, height: 6 }} />
                                 )}
-                            </TouchableOpacity>
+                            </Pressable>
                         )
                     })}
                 </ScrollView>
@@ -350,16 +342,16 @@ export default function CheckinScreen() {
                         const actionDisabled = savingId === aula.id
 
                         return (
-                            <View
+                            <Pressable
                                 key={aula.id}
-                                style={{
+                                style={({ pressed }) => ({
                                     marginBottom: 16,
                                     borderRadius: 30,
                                     borderWidth: 1,
-                                    borderColor: '#E2E8F0',
-                                    backgroundColor: '#FFFFFF',
+                                    borderColor: pressed ? '#F87171' : '#E2E8F0',
+                                    backgroundColor: pressed ? '#FFF5F5' : '#FFFFFF',
                                     padding: 22,
-                                }}
+                                })}
                             >
                                 <View
                                     style={{
@@ -458,44 +450,46 @@ export default function CheckinScreen() {
                                     </View>
                                 </View>
 
-                                <TouchableOpacity
-                                    activeOpacity={0.85}
+                                <Pressable
                                     disabled={actionDisabled}
                                     onPress={() => handlePresence(aula.id, isBooked)}
-                                    style={{
+                                    style={({ pressed }) => ({
                                         marginTop: 20,
                                         borderRadius: 18,
                                         backgroundColor: isBooked
-                                            ? '#F1F5F9'
+                                            ? '#22C55E'
                                             : aula.presenceActionEnabled
                                                 ? '#DC2626'
                                                 : '#E2E8F0',
                                         opacity: actionDisabled ? 0.7 : 1,
                                         paddingVertical: 16,
                                         alignItems: 'center',
-                                    }}
+                                        transform: [{ scale: pressed && !actionDisabled ? 0.985 : 1 }],
+                                    })}
                                 >
                                     {actionDisabled ? (
-                                        <ActivityIndicator color={isBooked ? '#334155' : '#FFFFFF'} />
+                                        <ActivityIndicator color="#FFFFFF" />
                                     ) : (
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                fontWeight: '900',
-                                                letterSpacing: 1.4,
-                                                color: isBooked
-                                                    ? '#334155'
-                                                    : aula.presenceActionEnabled
-                                                        ? '#FFFFFF'
-                                                        : '#475569',
-                                                textTransform: 'uppercase',
-                                            }}
-                                        >
-                                            {aula.presenceActionLabel ?? (isBooked ? 'Cancelar presenca' : isFull ? 'Sem vagas' : 'Confirmar presenca')}
-                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                            {isBooked ? <Feather name="check" size={16} color="#FFFFFF" /> : null}
+                                            <Text
+                                                style={{
+                                                    marginLeft: isBooked ? 8 : 0,
+                                                    fontSize: 12,
+                                                    fontWeight: '900',
+                                                    letterSpacing: 1.4,
+                                                    color: aula.presenceActionEnabled || isBooked ? '#FFFFFF' : '#475569',
+                                                    textTransform: 'uppercase',
+                                                }}
+                                            >
+                                                {isBooked
+                                                    ? 'Presenca confirmada'
+                                                    : aula.presenceActionLabel ?? (isFull ? 'Sem vagas' : 'Confirmar presenca')}
+                                            </Text>
+                                        </View>
                                     )}
-                                </TouchableOpacity>
-                            </View>
+                                </Pressable>
+                            </Pressable>
                         )
                     })
                 )}

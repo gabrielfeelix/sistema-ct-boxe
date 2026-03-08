@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchHistoricoData, type HistoricoData } from '@/lib/appData'
@@ -63,6 +64,7 @@ function createShadow(color: string, opacity: number, radius: number, elevation:
 
 export default function HistoricoScreen() {
     const { aluno } = useAuth()
+    const insets = useSafeAreaInsets()
     const monthOptions = useMemo(buildMonthOptions, [])
     const [mesAtualIndex, setMesAtualIndex] = useState(monthOptions.length - 1)
     const [loading, setLoading] = useState(true)
@@ -137,7 +139,7 @@ export default function HistoricoScreen() {
                     borderBottomColor: '#E2E8F0',
                     backgroundColor: '#FFFFFF',
                     paddingHorizontal: 24,
-                    paddingTop: 48,
+                    paddingTop: insets.top + 12,
                     paddingBottom: 24,
                 }}
             >
@@ -440,15 +442,15 @@ export default function HistoricoScreen() {
                                                             backgroundColor: isSelected
                                                                 ? '#CC0000'
                                                                 : hasPresenca
-                                                                  ? '#FEF2F2'
-                                                                  : '#FFFFFF',
+                                                                    ? '#FEF2F2'
+                                                                    : '#FFFFFF',
                                                             borderWidth: isSelected
                                                                 ? 0
                                                                 : isHoje && !hasPresenca
-                                                                  ? 2
-                                                                  : hasPresenca
-                                                                    ? 1
-                                                                    : 0,
+                                                                    ? 2
+                                                                    : hasPresenca
+                                                                        ? 1
+                                                                        : 0,
                                                             borderColor: isHoje && !hasPresenca ? '#0F172A' : '#FECACA',
                                                         }}
                                                     >
@@ -459,10 +461,10 @@ export default function HistoricoScreen() {
                                                                 color: isSelected
                                                                     ? '#FFFFFF'
                                                                     : hasPresenca
-                                                                      ? '#CC0000'
-                                                                      : isHoje
-                                                                        ? '#0F172A'
-                                                                        : '#475569',
+                                                                        ? '#CC0000'
+                                                                        : isHoje
+                                                                            ? '#0F172A'
+                                                                            : '#475569',
                                                             }}
                                                         >
                                                             {dia}

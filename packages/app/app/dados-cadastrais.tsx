@@ -104,6 +104,12 @@ export default function DadosCadastraisScreen() {
         if (!aluno?.id) return
 
         try {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+            if (!permission.granted) {
+                Alert.alert('Permissao necessaria', 'Permita o acesso a galeria para atualizar sua foto.')
+                return
+            }
+
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 allowsEditing: true,
@@ -116,6 +122,7 @@ export default function DadosCadastraisScreen() {
                 const novaUrl = await uploadFotoPerfil(aluno.id, result.assets[0].uri)
                 setFotoUrl(novaUrl)
                 await refreshAluno()
+                await loadData()
                 setUploadingFoto(false)
                 Alert.alert('Sucesso', 'Sua foto foi atualizada.')
             }
