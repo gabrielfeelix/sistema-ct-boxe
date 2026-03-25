@@ -165,13 +165,13 @@ export function useProfessores() {
 // Hook mais simples — apenas para pegar a lista para selects
 export function useProfessoresSelect() {
     const supabase = createClient()
-    const [professores, setProfessores] = useState<Pick<Professor, 'id' | 'nome' | 'cor_perfil' | 'role' | 'ativo' | 'email'>[]>([])
+    const [professores, setProfessores] = useState<Pick<Professor, 'id' | 'nome' | 'cor_perfil' | 'role' | 'ativo' | 'email' | 'foto_url'>[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         supabase
             .from('professores')
-            .select('id,nome,cor_perfil,role,ativo,email')
+            .select('id,nome,cor_perfil,role,ativo,email,foto_url')
             .eq('ativo', true)
             .order('nome')
             .then(({ data }) => {

@@ -1,3 +1,7 @@
+'use client'
+
+import { useState } from 'react'
+
 interface AvatarInitialsProps {
     nome: string
     fotoUrl?: string | null
@@ -14,7 +18,6 @@ function getInitials(nome: string): string {
         .toUpperCase()
 }
 
-// Gera uma cor determinística baseada no nome
 function getColor(nome: string): string {
     const colors = [
         'bg-red-500', 'bg-orange-500', 'bg-amber-500',
@@ -33,23 +36,30 @@ const sizes = {
 }
 
 export function AvatarInitials({ nome, fotoUrl, size = 'md' }: AvatarInitialsProps) {
-    if (fotoUrl) {
+    const [failedUrl, setFailedUrl] = useState<string | null>(null)
+    const shouldRenderImage = Boolean(fotoUrl) && fotoUrl !== failedUrl
+
+    if (shouldRenderImage) {
         return (
-            <img
-                src={fotoUrl}
-                alt={nome}
-                className={`${sizes[size]} rounded-full object-cover shrink-0 shadow-sm border border-black/5`}
-            />
+            <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                    src={fotoUrl ?? undefined}
+                    alt={nome}
+                    className={`${sizes[size]} rounded-full object-cover shrink-0 border border-black/5 shadow-sm`}
+                    onError={() => setFailedUrl(fotoUrl ?? null)}
+                />
+            </>
         )
     }
 
     return (
         <div
             className={`
-        ${sizes[size]} ${getColor(nome)}
-        rounded-full flex items-center justify-center
-        text-white font-bold shrink-0 shadow-sm
-      `}
+                ${sizes[size]} ${getColor(nome)}
+                rounded-full flex items-center justify-center
+                text-white font-bold shrink-0 shadow-sm
+            `}
         >
             {getInitials(nome)}
         </div>

@@ -1,15 +1,15 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Bell, Search, Timer as TimerIcon, ShieldCheck, GraduationCap, Settings, LogOut, ChevronDown } from 'lucide-react'
+import { Timer as TimerIcon, ShieldCheck, GraduationCap, Settings, LogOut, ChevronDown } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { GlobalSearch } from './GlobalSearch'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useProfessoresSelect } from '@/hooks/useProfessores'
 import { toast } from 'sonner'
-import { useNotificacoes } from '@/hooks/useNotificacoes'
 import { NotificationDropdown } from '../notifications/NotificationDropdown'
+import { AvatarInitials } from '@/components/shared/AvatarInitials'
 
 const pageTitles: Record<string, string> = {
     '/dashboard': 'Dashboard',
@@ -46,7 +46,6 @@ export function Header() {
         ?? professores.find(p => p.nome?.toLowerCase().includes('argel'))
         ?? (professores.length > 0 ? professores[0] : null)
 
-    const { naoLidas } = useNotificacoes(profAtual || undefined)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -69,8 +68,8 @@ export function Header() {
     const isAdmin = profAtual?.role === 'super_admin'
     const nomeExibido = profAtual?.nome ?? (userEmail?.split('@')[0] ?? 'Admin')
     const roleExibido = isAdmin ? 'ADMIN MASTER' : 'PROFESSOR'
-    const corPerfil = profAtual?.cor_perfil ?? '#CC0000'
-    const iniciais = nomeExibido.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
+    const primeiroNome = nomeExibido.split(' ')[0] ?? nomeExibido
+    const sobrenome = nomeExibido.split(' ')[1] ?? ''
 
     async function handleLogout() {
         await supabase.auth.signOut()
@@ -121,23 +120,20 @@ export function Header() {
                         onClick={() => setOpenDropdown(!openDropdown)}
                         className="flex items-center gap-3 p-1.5 pl-2 sm:pr-3 rounded-2xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all group"
                     >
-                        <div
-                            className="h-9 w-9 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-md shrink-0 transition-transform group-hover:scale-95"
-                            style={{ background: corPerfil }}
-                        >
-                            {iniciais}
+                        <div className="shrink-0 transition-transform group-hover:scale-95">
+                            <AvatarInitials nome={nomeExibido} fotoUrl={profAtual?.foto_url} size="md" />
                         </div>
                         <div className="text-left hidden sm:block">
                             <p className="text-sm font-black text-gray-900 leading-none flex items-center gap-1.5">
-                                {nomeExibido.split(' ')[0]} {nomeExibido.split(' ')[1] || ''}
+                                {primeiroNome} {sobrenome}
                                 <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${openDropdown ? 'rotate-180' : ''}`} />
                             </p>
-                            <p className="flex items-center gap-1 text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                            <div className="mt-1 flex items-center">
                                 {isAdmin
-                                    ? <span className="flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100"><ShieldCheck className="h-2.5 w-2.5" /> {roleExibido}</span>
-                                    : <span className="flex items-center gap-1 text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100"><GraduationCap className="h-2.5 w-2.5" /> {roleExibido}</span>
+                                    ? <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600 whitespace-nowrap"><ShieldCheck className="h-3 w-3" /> {roleExibido}</span>
+                                    : <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-blue-700 whitespace-nowrap"><GraduationCap className="h-3 w-3" /> {roleExibido}</span>
                                 }
-                            </p>
+                            </div>
                         </div>
                     </button>
 

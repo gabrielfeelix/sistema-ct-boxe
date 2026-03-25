@@ -6,12 +6,17 @@ import { Toaster } from 'sonner'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-    title: 'CT Boxe — Painel de Gestão',
-    description: 'Sistema de gestão do CT de Boxe — Equipe Argel Riboli',
+    title: 'CT de Boxe - Argel Riboli',
+    description: 'Sistema de gestao do CT de Boxe - Equipe Argel Riboli',
+    icons: {
+        icon: [{ url: '/logo-ct.png', type: 'image/png' }],
+        shortcut: ['/logo-ct.png'],
+        apple: ['/logo-ct.png'],
+    },
     appleWebApp: {
         capable: true,
         statusBarStyle: 'default',
-        title: 'CT Boxe',
+        title: 'CT de Boxe - Argel Riboli',
     },
     formatDetection: {
         telephone: false,
