@@ -86,7 +86,7 @@ export function Header() {
         'Painel'
 
     return (
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6 sticky top-0 z-30 shadow-sm/50">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-gray-100/70 bg-white/96 px-6 backdrop-blur-[2px] shadow-[0_1px_0_rgba(15,23,42,0.03)]">
             {/* Título (Esquerda) */}
             <h1 className="text-sm font-black text-gray-400 uppercase tracking-widest hidden lg:block min-w-[150px]">
                 {title}

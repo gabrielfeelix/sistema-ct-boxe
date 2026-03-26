@@ -70,7 +70,7 @@ export function Sidebar() {
 
     return (
         <aside className="flex h-screen w-[240px] shrink-0 flex-col border-r border-gray-200 bg-white">
-            <div className="flex min-h-[136px] items-center justify-center border-b border-gray-100 px-4 py-6">
+            <div className="flex min-h-[96px] items-center justify-center border-b border-gray-100 px-4 pb-2 pt-4">
                 <div className="flex w-full justify-center">
                     <Image
                         src="/logo-ct.png"
