@@ -254,7 +254,9 @@ export function useAulas({
                 return { data: null, error: 'Não foi possível criar a aula.' }
             }
 
-            await fetchAulas()
+            queueMicrotask(() => {
+                void fetchAulas()
+            })
             return { data: normalizeAulaRow(data as AulaRow), error: null }
         },
         [supabase, fetchAulas]

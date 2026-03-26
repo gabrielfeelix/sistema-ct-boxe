@@ -75,3 +75,69 @@ export async function cleanupPostsByPrefix(prefix: string) {
 
     await supabase.from('posts').delete().in('id', ids)
 }
+
+export async function cleanupEventosByPrefix(prefix: string) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) return
+
+    await supabase.from('eventos').delete().ilike('titulo', `${prefix}%`)
+}
+
+export async function cleanupAulasByPrefix(prefix: string) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) return
+
+    const { data: aulas } = await supabase.from('aulas').select('id').ilike('titulo', `${prefix}%`)
+    const ids = (aulas ?? []).map((aula) => aula.id)
+
+    if (ids.length === 0) return
+
+    await Promise.allSettled([
+        supabase.from('presencas').delete().in('aula_id', ids),
+    ])
+
+    await supabase.from('aulas').delete().in('id', ids)
+}
+
+export async function seedCandidato(input: { nome: string; email: string; telefone: string }) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) {
+        throw new Error('Service role client not configured for candidate seed.')
+    }
+
+    const { data, error } = await supabase
+        .from('candidatos')
+        .insert({
+            nome: input.nome,
+            email: input.email,
+            telefone: input.telefone,
+            status: 'aguardando',
+            experiencia_previa: 'iniciante',
+            como_conheceu: 'Instagram',
+            tem_condicao_medica: false,
+        })
+        .select('id')
+        .single()
+
+    if (error || !data) {
+        throw new Error(error?.message ?? 'Failed to seed candidate.')
+    }
+
+    return data.id as string
+}
+
+export async function cleanupCandidatoByEmail(email: string) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) return
+
+    const { data: candidatos } = await supabase.from('candidatos').select('id').eq('email', email)
+    const ids = (candidatos ?? []).map((candidato) => candidato.id)
+
+    if (ids.length === 0) return
+
+    await Promise.allSettled([
+        supabase.from('avaliacoes').delete().in('candidato_id', ids),
+    ])
+
+    await supabase.from('candidatos').delete().in('id', ids)
+}
