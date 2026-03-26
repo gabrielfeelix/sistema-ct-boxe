@@ -12,5 +12,12 @@
         "./tailwind.config.js"
       ]
     }
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".expo",
+    ".expo-export-check*",
+    ".expo-export-web-check"
+  ]
 }
