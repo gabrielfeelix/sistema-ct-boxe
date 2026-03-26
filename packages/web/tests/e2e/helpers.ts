@@ -54,10 +54,38 @@ export async function cleanupAlunoByEmail(email: string) {
         supabase.from('avaliacoes').delete().in('aluno_id', ids),
         supabase.from('presencas').delete().in('aluno_id', ids),
         supabase.from('pagamentos').delete().in('aluno_id', ids),
+        supabase.from('aluno_documentos').delete().in('aluno_id', ids),
         supabase.from('contratos').delete().in('aluno_id', ids),
     ])
 
     await supabase.from('alunos').delete().in('id', ids)
+}
+
+export async function seedAluno(input: { nome: string; email: string; telefone: string; cpf?: string }) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) {
+        throw new Error('Service role client not configured for student seed.')
+    }
+
+    const { data, error } = await supabase
+        .from('alunos')
+        .insert({
+            nome: input.nome,
+            email: input.email,
+            telefone: input.telefone,
+            cpf: input.cpf ?? null,
+            status: 'ativo',
+            total_treinos: 0,
+            data_cadastro: new Date().toISOString().slice(0, 10),
+        })
+        .select('id')
+        .single()
+
+    if (error || !data) {
+        throw new Error(error?.message ?? 'Failed to seed student.')
+    }
+
+    return data.id as string
 }
 
 export async function cleanupPostsByPrefix(prefix: string) {
@@ -97,6 +125,34 @@ export async function cleanupAulasByPrefix(prefix: string) {
     ])
 
     await supabase.from('aulas').delete().in('id', ids)
+}
+
+export async function cleanupContratoModelosByPrefix(prefix: string) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) return
+
+    await supabase.from('contrato_modelos').delete().ilike('titulo', `${prefix}%`)
+}
+
+export async function findPendingDocumentoByAlunoEmail(email: string) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) {
+        throw new Error('Service role client not configured for contract lookup.')
+    }
+
+    const { data: aluno } = await supabase.from('alunos').select('id').eq('email', email).maybeSingle()
+    if (!aluno?.id) return null
+
+    const { data } = await supabase
+        .from('aluno_documentos')
+        .select('id, titulo, texto, status, validade')
+        .eq('aluno_id', aluno.id)
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    return data ?? null
 }
 
 export async function seedCandidato(input: { nome: string; email: string; telefone: string }) {

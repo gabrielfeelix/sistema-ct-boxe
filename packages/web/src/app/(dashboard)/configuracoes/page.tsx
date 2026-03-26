@@ -1,26 +1,38 @@
 import Link from 'next/link'
-import { BellRing, ChevronRight, CreditCard, Settings2, ShieldCheck, UserRound } from 'lucide-react'
+import { BellRing, ChevronRight, CreditCard, FileText, Settings2, ShieldCheck, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 
 interface ConfigSnapshot {
     planosAtivos: number
     totalPlanos: number
     naoLidas: number
+    totalModelosContrato: number
+    versoesAtivasContrato: number
 }
 
 async function getConfigSnapshot(): Promise<ConfigSnapshot> {
     const supabase = await createClient()
 
-    const [planosAtivosResult, totalPlanosResult, naoLidasResult] = await Promise.all([
+    const [
+        planosAtivosResult,
+        totalPlanosResult,
+        naoLidasResult,
+        totalModelosContratoResult,
+        versoesAtivasContratoResult,
+    ] = await Promise.all([
         supabase.from('planos').select('id', { count: 'exact', head: true }).eq('ativo', true),
         supabase.from('planos').select('id', { count: 'exact', head: true }),
         supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('lida', false),
+        supabase.from('contrato_modelos').select('id', { count: 'exact', head: true }),
+        supabase.from('contrato_modelos').select('id', { count: 'exact', head: true }).eq('ativo', true),
     ])
 
     return {
         planosAtivos: planosAtivosResult.count ?? 0,
         totalPlanos: totalPlanosResult.count ?? 0,
         naoLidas: naoLidasResult.count ?? 0,
+        totalModelosContrato: totalModelosContratoResult.count ?? 0,
+        versoesAtivasContrato: versoesAtivasContratoResult.count ?? 0,
     }
 }
 
@@ -81,11 +93,11 @@ export default async function ConfiguracoesPage() {
                             Centro de Configuracoes
                         </h2>
                         <p className="mt-1 text-sm font-medium text-gray-500">
-                            Ajuste identidade do admin, planos e regras operacionais do painel.
+                            Ajuste identidade do admin, contratos, planos e regras operacionais do painel.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                         <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-center">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Planos ativos</p>
                             <p className="mt-1 text-xl font-black text-gray-900">{snapshot.planosAtivos}</p>
@@ -98,11 +110,18 @@ export default async function ConfiguracoesPage() {
                             <p className="text-[10px] font-bold uppercase tracking-wider text-red-500">Nao lidas</p>
                             <p className="mt-1 text-xl font-black text-red-700">{snapshot.naoLidas}</p>
                         </div>
+                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-center">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Contratos</p>
+                            <p className="mt-1 text-xl font-black text-gray-900">{snapshot.totalModelosContrato}</p>
+                            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                {snapshot.versoesAtivasContrato} ativa
+                            </p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <section className="grid gap-5 md:grid-cols-2">
+            <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <ConfigCard
                     title="Perfil do Administrador"
                     description="Atualize nome publico, contato principal e credenciais de acesso."
@@ -116,6 +135,14 @@ export default async function ConfiguracoesPage() {
                     href="/configuracoes/planos"
                     icon={CreditCard}
                     tone="bg-orange-400/20"
+                />
+                <ConfigCard
+                    title="Contratos"
+                    description="Versione o texto oficial e publique a versao que o app e o painel vao usar."
+                    href="/configuracoes/contratos"
+                    icon={FileText}
+                    tone="bg-rose-400/20"
+                    badge={snapshot.versoesAtivasContrato > 0 ? `viva ${snapshot.versoesAtivasContrato}` : 'configurar'}
                 />
                 <ConfigCard
                     title="Central de Notificacoes"

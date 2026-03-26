@@ -68,3 +68,24 @@ CREATE INDEX IF NOT EXISTS idx_series_tipo ON series_aulas(tipo_aula);
 -- ============================================
 -- FIM DAS MIGRATIONS
 -- ============================================
+
+-- ============================================
+-- 007: Modelos versionados de contrato
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS contrato_modelos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  versao INTEGER NOT NULL CHECK (versao > 0),
+  resumo TEXT,
+  conteudo TEXT NOT NULL,
+  pdf_url TEXT,
+  ativo BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_contrato_modelos_slug_versao UNIQUE (slug, versao)
+);
+
+CREATE INDEX IF NOT EXISTS idx_contrato_modelos_slug_ativo
+  ON contrato_modelos(slug, ativo DESC, versao DESC);

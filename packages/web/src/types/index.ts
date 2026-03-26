@@ -255,6 +255,19 @@ export interface ContratoCompleto {
     updated_at: string
 }
 
+export interface ContratoModelo {
+    id: string
+    slug: string
+    titulo: string
+    versao: number
+    resumo?: string | null
+    conteudo: string
+    pdf_url?: string | null
+    ativo: boolean
+    created_at: string
+    updated_at: string
+}
+
 // ─── Pagamento completo (com join de aluno) ───────────────────────────────
 export interface PagamentoCompleto extends Omit<Pagamento, 'aluno' | 'contrato'> {
     aluno?: {

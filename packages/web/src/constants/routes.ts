@@ -30,4 +30,5 @@ export const ROUTES = {
     CONFIGURACOES: '/configuracoes',
     CONFIG_PLANOS: '/configuracoes/planos',
     CONFIG_PERFIL: '/configuracoes/perfil',
+    CONFIG_CONTRATOS: '/configuracoes/contratos',
 } as const

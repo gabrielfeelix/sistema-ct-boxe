@@ -122,7 +122,7 @@ export function ModalImportacaoLote({ isOpen, onClose, onSuccess }: ModalImporta
                                 valor: plano.valor,
                                 data_inicio: dataInicio,
                                 data_fim: dataFim.toISOString().split('T')[0],
-                                status: entry.status_financeiro === 'pago' ? 'ativo' : 'pendente'
+                                status: 'ativo'
                             })
 
                             if (entry.status_financeiro === 'pago') {
