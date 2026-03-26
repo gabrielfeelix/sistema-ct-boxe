@@ -9,9 +9,9 @@ export const metadata: Metadata = {
     title: 'CT de Boxe - Argel Riboli',
     description: 'Sistema de gestao do CT de Boxe - Equipe Argel Riboli',
     icons: {
-        icon: [{ url: '/logo-ct.png', type: 'image/png' }],
-        shortcut: ['/logo-ct.png'],
-        apple: ['/logo-ct.png'],
+        icon: [{ url: '/icon.png', type: 'image/png' }],
+        shortcut: ['/favicon.ico'],
+        apple: ['/apple-icon.png'],
     },
     appleWebApp: {
         capable: true,
