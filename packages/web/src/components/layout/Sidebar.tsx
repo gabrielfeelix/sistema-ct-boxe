@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -48,7 +48,7 @@ const navItems = [
 
 export function Sidebar() {
     const pathname = usePathname()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const { pendentes: pendentesCandidatos } = useCandidatos()
     const { avaliacoes: pendentesAvaliacoes } = useAvaliacoesPendentes()
     const { professores } = useProfessoresSelect()
@@ -70,18 +70,17 @@ export function Sidebar() {
 
     return (
         <aside className="flex h-screen w-[240px] shrink-0 flex-col border-r border-gray-200 bg-white">
-            <div className="flex h-16 items-center gap-3 border-b border-gray-100 px-5">
-                <Image
-                    src="/logo-ct.png"
-                    alt="CT de Boxe Argel Riboli"
-                    width={88}
-                    height={36}
-                    className="h-9 w-auto object-contain"
-                    priority
-                />
-                <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 whitespace-nowrap">
-                    Admin
-                </span>
+            <div className="flex min-h-[136px] items-center justify-center border-b border-gray-100 px-4 py-6">
+                <div className="flex w-full justify-center">
+                    <Image
+                        src="/logo-ct.png"
+                        alt="CT de Boxe Argel Riboli"
+                        width={216}
+                        height={108}
+                        className="h-auto w-[216px] max-w-full object-contain"
+                        priority
+                    />
+                </div>
             </div>
 
             <nav className="flex-1 overflow-y-auto px-3 py-3">
