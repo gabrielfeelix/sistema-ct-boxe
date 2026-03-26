@@ -33,6 +33,7 @@ const pageTitles: Record<string, string> = {
     '/configuracoes/planos': 'Planos',
     '/configuracoes/perfil': 'Perfil',
     '/configuracoes/contratos': 'Contratos',
+    '/configuracoes/seguranca-operacional': 'Seguranca Operacional',
 }
 
 export function Header() {

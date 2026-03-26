@@ -5,19 +5,22 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-    LayoutDashboard,
-    Users,
-    UserCheck,
-    FileText,
-    DollarSign,
+    BarChart2,
+    Bell,
     Calendar,
     CheckSquare,
-    Rss,
-    Play,
-    Bell,
-    BarChart2,
+    CreditCard,
+    DollarSign,
+    FileText,
     GraduationCap,
+    LayoutDashboard,
     PartyPopper,
+    Play,
+    Rss,
+    ShieldCheck,
+    UserCheck,
+    UserRound,
+    Users,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ROUTES } from '@/constants/routes'
@@ -30,20 +33,66 @@ function cn(...classes: (string | boolean | undefined)[]) {
     return classes.filter(Boolean).join(' ')
 }
 
-const navItems = [
-    { label: 'Dashboard', href: ROUTES.DASHBOARD, icon: LayoutDashboard },
-    { label: 'Presença', href: ROUTES.PRESENCA, icon: CheckSquare },
-    { label: 'Aulas', href: ROUTES.AULAS, icon: Calendar },
-    { label: 'Alunos', href: ROUTES.ALUNOS, icon: Users },
-    { label: 'Candidatos', href: ROUTES.CANDIDATOS, icon: UserCheck },
-    { label: 'Contratos', href: ROUTES.CONTRATOS, icon: FileText },
-    { label: 'Financeiro', href: ROUTES.FINANCEIRO, icon: DollarSign, adminOnly: true },
-    { label: 'Professores', href: '/professores', icon: GraduationCap, adminOnly: true },
-    { label: 'Feed', href: ROUTES.FEED, icon: Rss },
-    { label: 'Stories', href: ROUTES.STORIES, icon: Play },
-    { label: 'Eventos', href: ROUTES.EVENTOS, icon: PartyPopper },
-    { label: 'Notificações', href: ROUTES.NOTIFICACOES, icon: Bell },
-    { label: 'Relatórios', href: '/relatorios', icon: BarChart2, adminOnly: true },
+type NavItem = {
+    label: string
+    href: string
+    icon: React.ElementType
+    adminOnly?: boolean
+    badge?: 'candidatos' | 'avaliacoes' | 'notificacoes'
+}
+
+type NavSection = {
+    label: string
+    items: NavItem[]
+}
+
+const navSections: NavSection[] = [
+    {
+        label: 'Visao Executiva',
+        items: [
+            { label: 'Dashboard', href: ROUTES.DASHBOARD, icon: LayoutDashboard },
+            { label: 'Central de Notificacoes', href: ROUTES.NOTIFICACOES, icon: Bell, badge: 'notificacoes' },
+            { label: 'Relatorios', href: '/relatorios', icon: BarChart2, adminOnly: true },
+        ],
+    },
+    {
+        label: 'Operacao Diaria',
+        items: [
+            { label: 'Alunos', href: ROUTES.ALUNOS, icon: Users },
+            { label: 'Candidatos', href: ROUTES.CANDIDATOS, icon: UserCheck, badge: 'candidatos' },
+            { label: 'Presenca', href: ROUTES.PRESENCA, icon: CheckSquare },
+            { label: 'Aulas', href: ROUTES.AULAS, icon: Calendar },
+            { label: 'Eventos', href: ROUTES.EVENTOS, icon: PartyPopper },
+        ],
+    },
+    {
+        label: 'Receita e Contratos',
+        items: [
+            { label: 'Financeiro', href: ROUTES.FINANCEIRO, icon: DollarSign, adminOnly: true },
+            { label: 'Contratos', href: ROUTES.CONFIG_CONTRATOS, icon: FileText },
+            { label: 'Planos e Precificacao', href: ROUTES.CONFIG_PLANOS, icon: CreditCard },
+        ],
+    },
+    {
+        label: 'Conteudo e Comunidade',
+        items: [
+            { label: 'Feed', href: ROUTES.FEED, icon: Rss },
+            { label: 'Stories', href: ROUTES.STORIES, icon: Play },
+        ],
+    },
+    {
+        label: 'Equipe e Admin',
+        items: [
+            { label: 'Professores', href: '/professores', icon: GraduationCap, adminOnly: true },
+            { label: 'Perfil do Admin', href: ROUTES.CONFIG_PERFIL, icon: UserRound },
+            {
+                label: 'Seguranca Operacional',
+                href: ROUTES.CONFIG_SEGURANCA_OPERACIONAL,
+                icon: ShieldCheck,
+                adminOnly: true,
+            },
+        ],
+    },
 ]
 
 export function Sidebar() {
@@ -54,9 +103,10 @@ export function Sidebar() {
     const { professores } = useProfessoresSelect()
     const [userEmail, setUserEmail] = useState<string | null>(null)
 
-    const profAtual = professores.find((p) => p.email?.toLowerCase() === userEmail?.toLowerCase())
-        ?? professores.find((p) => p.nome?.toLowerCase().includes('argel'))
-        ?? (professores.length > 0 ? professores[0] : null)
+    const profAtual =
+        professores.find((p) => p.email?.toLowerCase() === userEmail?.toLowerCase()) ??
+        professores.find((p) => p.nome?.toLowerCase().includes('argel')) ??
+        (professores.length > 0 ? professores[0] : null)
 
     const { naoLidasAlertas: totalNotificacoes } = useNotificacoes(profAtual || undefined)
 
@@ -68,8 +118,15 @@ export function Sidebar() {
 
     const isAdmin = profAtual?.role === 'super_admin'
 
+    function getBadgeValue(item: NavItem) {
+        if (item.badge === 'candidatos') return pendentesCandidatos
+        if (item.badge === 'avaliacoes') return pendentesAvaliacoes.length
+        if (item.badge === 'notificacoes') return totalNotificacoes
+        return 0
+    }
+
     return (
-        <aside className="flex h-screen w-[240px] shrink-0 flex-col border-r border-gray-200 bg-white">
+        <aside className="flex h-screen w-[252px] shrink-0 flex-col border-r border-gray-200 bg-white">
             <div className="flex min-h-[96px] items-center justify-center border-b border-gray-100 px-4 pb-2 pt-4">
                 <div className="flex w-full justify-center">
                     <Image
@@ -84,51 +141,65 @@ export function Sidebar() {
             </div>
 
             <nav className="flex-1 overflow-y-auto px-3 py-3">
-                <ul className="space-y-0.5">
-                    {navItems.map((item) => {
-                        if (item.adminOnly && !isAdmin) return null
-
-                        const Icon = item.icon
-                        const isActive =
-                            item.href === '/dashboard'
-                                ? pathname === '/dashboard'
-                                : pathname.startsWith(item.href)
+                <div className="space-y-5">
+                    {navSections.map((section) => {
+                        const visibleItems = section.items.filter((item) => !item.adminOnly || isAdmin)
+                        if (visibleItems.length === 0) return null
 
                         return (
-                            <li key={item.href}>
-                                <Link
-                                    href={item.href}
-                                    className={cn(
-                                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                                        isActive
-                                            ? 'bg-[#CC0000] text-white shadow-sm'
-                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                    )}
-                                >
-                                    <Icon className="h-4 w-4 shrink-0" />
-                                    <div className="flex w-full items-center justify-between">
-                                        <span>{item.label}</span>
-                                        {item.label === 'Candidatos' && pendentesCandidatos > 0 && (
-                                            <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#CC0000] px-1.5 text-xs font-bold text-white shadow-sm">
-                                                {pendentesCandidatos}
-                                            </span>
-                                        )}
-                                        {item.label === 'Avaliações' && pendentesAvaliacoes.length > 0 && (
-                                            <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-bold text-white shadow-sm">
-                                                {pendentesAvaliacoes.length}
-                                            </span>
-                                        )}
-                                        {item.label === 'Notificações' && totalNotificacoes > 0 && (
-                                            <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-bold text-white shadow-sm animate-pulse">
-                                                {totalNotificacoes}
-                                            </span>
-                                        )}
-                                    </div>
-                                </Link>
-                            </li>
+                            <section key={section.label}>
+                                <p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                    {section.label}
+                                </p>
+                                <ul className="space-y-0.5">
+                                    {visibleItems.map((item) => {
+                                        const Icon = item.icon
+                                        const isActive =
+                                            item.href === ROUTES.DASHBOARD
+                                                ? pathname === ROUTES.DASHBOARD
+                                                : pathname.startsWith(item.href)
+                                        const badgeValue = getBadgeValue(item)
+
+                                        return (
+                                            <li key={item.href}>
+                                                <Link
+                                                    href={item.href}
+                                                    className={cn(
+                                                        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                                                        isActive
+                                                            ? 'bg-[#CC0000] text-white shadow-sm'
+                                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                                    )}
+                                                >
+                                                    <Icon className="h-4 w-4 shrink-0" />
+                                                    <div className="flex w-full items-center justify-between gap-2">
+                                                        <span>{item.label}</span>
+                                                        {badgeValue > 0 && (
+                                                            <span
+                                                                className={cn(
+                                                                    'ml-2 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold shadow-sm',
+                                                                    isActive
+                                                                        ? 'bg-white/20 text-white'
+                                                                        : item.badge === 'notificacoes'
+                                                                          ? 'bg-amber-500 text-white'
+                                                                          : item.badge === 'avaliacoes'
+                                                                            ? 'bg-blue-500 text-white'
+                                                                            : 'bg-[#CC0000] text-white'
+                                                                )}
+                                                            >
+                                                                {badgeValue}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </Link>
+                                            </li>
+                                        )
+                                    })}
+                                </ul>
+                            </section>
                         )
                     })}
-                </ul>
+                </div>
             </nav>
         </aside>
     )

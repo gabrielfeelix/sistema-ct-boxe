@@ -1,38 +1,18 @@
 import Link from 'next/link'
-import { BellRing, ChevronRight, CreditCard, FileText, Settings2, ShieldCheck, UserRound } from 'lucide-react'
+import { BellRing, ChevronRight, Settings2, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { ROUTES } from '@/constants/routes'
 
 interface ConfigSnapshot {
-    planosAtivos: number
-    totalPlanos: number
     naoLidas: number
-    totalModelosContrato: number
-    versoesAtivasContrato: number
 }
 
 async function getConfigSnapshot(): Promise<ConfigSnapshot> {
     const supabase = await createClient()
-
-    const [
-        planosAtivosResult,
-        totalPlanosResult,
-        naoLidasResult,
-        totalModelosContratoResult,
-        versoesAtivasContratoResult,
-    ] = await Promise.all([
-        supabase.from('planos').select('id', { count: 'exact', head: true }).eq('ativo', true),
-        supabase.from('planos').select('id', { count: 'exact', head: true }),
-        supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('lida', false),
-        supabase.from('contrato_modelos').select('id', { count: 'exact', head: true }),
-        supabase.from('contrato_modelos').select('id', { count: 'exact', head: true }).eq('ativo', true),
-    ])
+    const { count } = await supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('lida', false)
 
     return {
-        planosAtivos: planosAtivosResult.count ?? 0,
-        totalPlanos: totalPlanosResult.count ?? 0,
-        naoLidas: naoLidasResult.count ?? 0,
-        totalModelosContrato: totalModelosContratoResult.count ?? 0,
-        versoesAtivasContrato: versoesAtivasContratoResult.count ?? 0,
+        naoLidas: count ?? 0,
     }
 }
 
@@ -51,16 +31,14 @@ function ConfigCard({
     tone: string
     badge?: string
 }) {
-    const toneClass = tone.replace('/20', '/10')
-
     return (
         <Link
             href={href}
-            className="group relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+            className="group relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
         >
             <div className="relative z-10 flex items-start justify-between gap-4">
                 <div>
-                    <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 ${toneClass} text-gray-700`}>
+                    <div className={`mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 ${tone} text-gray-700`}>
                         <Icon className="h-5 w-5" />
                     </div>
                     <h3 className="text-lg font-black tracking-tight text-gray-900">{title}</h3>
@@ -84,88 +62,46 @@ export default async function ConfiguracoesPage() {
     const snapshot = await getConfigSnapshot()
 
     return (
-        <div className="mx-auto max-w-[1200px] space-y-6 pb-8">
+        <div className="mx-auto max-w-[1100px] space-y-6 pb-8">
             <section className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
                 <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
+                    <div className="max-w-3xl">
                         <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight text-gray-900">
                             <Settings2 className="h-6 w-6 text-[#CC0000]" />
-                            Centro de Configuracoes
+                            Central Institucional
                         </h2>
                         <p className="mt-1 text-sm font-medium text-gray-500">
-                            Ajuste identidade do admin, contratos, planos e regras operacionais do painel.
+                            Esta area ficou reservada para identidade da conta administrativa e leitura centralizada de alertas.
+                            Contratos, planos, financeiro e seguranca operacional agora ficam direto na sidebar.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-center">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Planos ativos</p>
-                            <p className="mt-1 text-xl font-black text-gray-900">{snapshot.planosAtivos}</p>
-                        </div>
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-center">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Catalogo</p>
-                            <p className="mt-1 text-xl font-black text-gray-900">{snapshot.totalPlanos}</p>
-                        </div>
-                        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-center">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-red-500">Nao lidas</p>
-                            <p className="mt-1 text-xl font-black text-red-700">{snapshot.naoLidas}</p>
-                        </div>
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-center">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Contratos</p>
-                            <p className="mt-1 text-xl font-black text-gray-900">{snapshot.totalModelosContrato}</p>
-                            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                                {snapshot.versoesAtivasContrato} ativa
-                            </p>
-                        </div>
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Nao lidas</p>
+                        <p className="mt-1 text-2xl font-black text-gray-900">{snapshot.naoLidas}</p>
+                        <p className="mt-1 text-xs font-bold uppercase tracking-wider text-gray-400">
+                            central de notificacoes
+                        </p>
                     </div>
                 </div>
             </section>
 
-            <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <section className="grid gap-5 md:grid-cols-2">
                 <ConfigCard
                     title="Perfil do Administrador"
-                    description="Atualize nome publico, contato principal e credenciais de acesso."
-                    href="/configuracoes/perfil"
+                    description="Atualize nome publico, contato principal e os dados usados no painel."
+                    href={ROUTES.CONFIG_PERFIL}
                     icon={UserRound}
-                    tone="bg-blue-400/20"
-                />
-                <ConfigCard
-                    title="Planos e Precificacao"
-                    description="Gerencie pacotes mensais, recorrencia e regras de assinatura."
-                    href="/configuracoes/planos"
-                    icon={CreditCard}
-                    tone="bg-orange-400/20"
-                />
-                <ConfigCard
-                    title="Contratos"
-                    description="Versione o texto oficial e publique a versao que o app e o painel vao usar."
-                    href="/configuracoes/contratos"
-                    icon={FileText}
-                    tone="bg-rose-400/20"
-                    badge={snapshot.versoesAtivasContrato > 0 ? `viva ${snapshot.versoesAtivasContrato}` : 'configurar'}
+                    tone="bg-blue-50"
                 />
                 <ConfigCard
                     title="Central de Notificacoes"
-                    description="Revise alertas do sistema e limpe pendencias de comunicacao."
-                    href="/notificacoes"
+                    description="Revise alertas operacionais, comunicados e regras automaticas do sistema."
+                    href={ROUTES.NOTIFICACOES}
                     icon={BellRing}
-                    tone="bg-red-400/20"
+                    tone="bg-red-50"
                     badge={snapshot.naoLidas > 0 ? `${snapshot.naoLidas} novas` : undefined}
                 />
-                <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-                    <div className="relative z-10">
-                        <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700">
-                            <ShieldCheck className="h-5 w-5" />
-                        </div>
-                        <h3 className="text-lg font-black tracking-tight text-gray-900">Seguranca operacional</h3>
-                        <p className="mt-1 text-sm font-medium leading-relaxed text-gray-500">
-                            Controle de permissoes e auditoria de acessos sera disponibilizado nas proximas iteracoes.
-                        </p>
-                        <span className="mt-4 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-                            Em breve
-                        </span>
-                    </div>
-                </div>
             </section>
         </div>
     )
