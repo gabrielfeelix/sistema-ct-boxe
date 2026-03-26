@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Upload, Video as VideoIcon, Layers, FileText, Image as ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -9,7 +9,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
 export default function NovoVideoTrilhaPage() {
     const router = useRouter()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
     const [titulo, setTitulo] = useState('')
     const [descricao, setDescricao] = useState('')
@@ -17,7 +17,7 @@ export default function NovoVideoTrilhaPage() {
     const [novaCategoria, setNovaCategoria] = useState('')
     const [capaUrl, setCapaUrl] = useState('')
     const [videoUrl, setVideoUrl] = useState('')
-    const [ordem, setOrdem] = useState(0)
+    const [ordem] = useState(0)
     const [salvando, setSalvando] = useState(false)
     const [dbCategorias, setDbCategorias] = useState<{ id: string, nome: string }[]>([])
 
@@ -28,14 +28,16 @@ export default function NovoVideoTrilhaPage() {
 
 
 
-    const fetchCats = async () => {
+    const fetchCats = useCallback(async () => {
         const { data } = await supabase.from('trilhas_categorias').select('id, nome').eq('ativo', true).order('ordem', { ascending: true })
         if (data) setDbCategorias(data)
-    }
+    }, [supabase])
 
     useEffect(() => {
-        fetchCats()
-    }, [])
+        queueMicrotask(() => {
+            void fetchCats()
+        })
+    }, [fetchCats])
 
     async function handleCriarCategoria() {
         if (!novaCategoria.trim()) return
@@ -120,7 +122,7 @@ export default function NovoVideoTrilhaPage() {
 
         if (uploadError) {
             console.error('Storage Upload Error:', uploadError)
-            toast.error('Erro de I/O no Storage: ' + (uploadError as any).message || 'Tente reduzir o tamanho do vídeo.')
+            toast.error(`Erro de I/O no Storage: ${uploadError.message || 'Tente reduzir o tamanho do vídeo.'}`)
             setUploadando(false)
             return
         }
@@ -260,7 +262,10 @@ export default function NovoVideoTrilhaPage() {
                                     </label>
                                 ) : (
                                     <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                                        <img src={capaUrl} alt="Capa do mÃ³dulo" className="h-40 w-full object-cover" />
+                                        <>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={capaUrl} alt="Capa do mÃ³dulo" className="h-40 w-full object-cover" />
+                                        </>
                                         <button
                                             type="button"
                                             onClick={() => setCapaUrl('')}

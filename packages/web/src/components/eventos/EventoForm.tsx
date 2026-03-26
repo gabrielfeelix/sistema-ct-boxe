@@ -242,7 +242,10 @@ export function EventoForm({
                     </div>
 
                     <div className="overflow-hidden rounded-3xl border border-gray-100 bg-gray-50">
-                        <img src={previewImage} alt="Preview do evento" className="h-72 w-full object-cover" />
+                        <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={previewImage} alt="Preview do evento" className="h-72 w-full object-cover" />
+                        </>
                     </div>
 
                     <div className="mt-4 space-y-3">

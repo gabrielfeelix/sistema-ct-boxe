@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, GraduationCap, Search, Trash2, Mail, Phone, Palette, ShieldCheck, UserPlus, MoreVertical, Edit2, CheckCircle2 } from 'lucide-react'
+import { GraduationCap, Search, Trash2, Mail, Phone, ShieldCheck, UserPlus, Edit2, CheckCircle2 } from 'lucide-react'
 import { useProfessores } from '@/hooks/useProfessores'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { toast } from 'sonner'
+import type { Professor, ProfessorRole } from '@/hooks/useProfessores'
 
 export default function ProfessoresPage() {
     const { professores, loading, criarprofessor, atualizarProfessor, excluirProfessor, toggleAtivo } = useProfessores()
@@ -52,14 +53,14 @@ export default function ProfessoresPage() {
             }
             setModalAberto(false)
             limparForm()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Erro ao salvar professor.')
         } finally {
             setSubmetendo(false)
         }
     }
 
-    function prepararEdicao(p: any) {
+    function prepararEdicao(p: Professor) {
         setEditando(p.id)
         setNome(p.nome)
         setEmail(p.email)
@@ -250,7 +251,7 @@ export default function ProfessoresPage() {
                                     <select
                                         className="w-full h-12 bg-gray-50 border border-gray-200 focus:bg-white rounded-2xl px-4 font-bold outline-none focus:ring-2 focus:ring-[#CC0000]/10 focus:border-[#CC0000] transition-all text-sm cursor-pointer"
                                         value={role}
-                                        onChange={e => setRole(e.target.value as any)}
+                                        onChange={e => setRole(e.target.value as ProfessorRole)}
                                     >
                                         <option value="professor">Professor</option>
                                         <option value="super_admin">Administrador Master</option>

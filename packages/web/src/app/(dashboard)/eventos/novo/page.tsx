@@ -17,7 +17,7 @@ export default function NovoEventoPage() {
 
     async function handleSubmit(values: EventoFormValues) {
         setSaving(true)
-        const { data, error } = await criarEvento(values)
+        const { error } = await criarEvento(values)
         setSaving(false)
 
         if (error) {

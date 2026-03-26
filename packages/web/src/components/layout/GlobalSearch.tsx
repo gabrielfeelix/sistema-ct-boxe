@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, FileText, UserCheck, Users, Loader2, FileSignature } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -14,6 +14,20 @@ type SearchResult = {
     icon: React.ElementType
 }
 
+type ContratoSearchRow = {
+    id: string
+    status: string
+    aluno: { nome?: string | null } | Array<{ nome?: string | null }> | null
+}
+
+function getAlunoContratoNome(aluno: ContratoSearchRow['aluno']) {
+    if (Array.isArray(aluno)) {
+        return aluno[0]?.nome ?? null
+    }
+
+    return aluno?.nome ?? null
+}
+
 export function GlobalSearch() {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
@@ -22,9 +36,8 @@ export function GlobalSearch() {
     const wrapperRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const router = useRouter()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    // Atalho Cmd+K / Ctrl+K
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -32,24 +45,24 @@ export function GlobalSearch() {
                 inputRef.current?.focus()
             }
         }
+
         document.addEventListener('keydown', handleKeyDown)
         return () => document.removeEventListener('keydown', handleKeyDown)
     }, [])
 
-    // Click outside para fechar
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
                 setOpen(false)
             }
         }
+
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
     useEffect(() => {
         if (!query || query.length < 2) {
-            setResults([])
             return
         }
 
@@ -61,57 +74,57 @@ export function GlobalSearch() {
                 { data: alunos },
                 { data: candidatos },
                 { data: contratos },
-                { data: planos }
+                { data: planos },
             ] = await Promise.all([
                 supabase.from('alunos').select('id, nome, email, status').ilike('nome', q).limit(3),
                 supabase.from('candidatos').select('id, nome, email, status').ilike('nome', q).limit(3),
                 supabase.from('contratos').select('id, status, aluno:aluno_id(nome)').ilike('aluno.nome', q).limit(3),
-                supabase.from('planos').select('id, nome, tipo').ilike('nome', q).limit(2)
+                supabase.from('planos').select('id, nome, tipo').ilike('nome', q).limit(2),
             ])
 
             const formatted: SearchResult[] = []
 
             if (alunos) {
-                formatted.push(...alunos.map(a => ({
+                formatted.push(...alunos.map((a) => ({
                     id: a.id,
                     title: a.nome,
                     subtitle: a.status === 'ativo' ? 'Aluno Ativo' : 'Aluno Inativo',
                     type: 'aluno' as const,
                     href: `/alunos/${a.id}`,
-                    icon: Users
+                    icon: Users,
                 })))
             }
 
             if (candidatos) {
-                formatted.push(...candidatos.map(c => ({
+                formatted.push(...candidatos.map((c) => ({
                     id: c.id,
                     title: c.nome,
                     subtitle: c.status === 'aguardando' ? 'Processo Seletivo' : c.status,
                     type: 'candidato' as const,
                     href: `/candidatos/${c.id}`,
-                    icon: UserCheck
+                    icon: UserCheck,
                 })))
             }
 
             if (contratos) {
-                formatted.push(...contratos.map(c => ({
+                formatted.push(...contratos.map((c) => ({
                     id: c.id,
-                    title: (c.aluno as any)?.nome || 'Contrato Sem Nome',
+                    title: getAlunoContratoNome((c as ContratoSearchRow).aluno) || 'Contrato Sem Nome',
                     subtitle: `Status: ${c.status}`,
                     type: 'contrato' as const,
                     href: `/contratos/${c.id}`,
-                    icon: FileSignature
+                    icon: FileSignature,
                 })))
             }
 
             if (planos) {
-                formatted.push(...planos.map(p => ({
+                formatted.push(...planos.map((p) => ({
                     id: p.id,
                     title: p.nome,
                     subtitle: `Plano ${p.tipo.toUpperCase()}`,
                     type: 'plano' as const,
                     href: `/configuracoes/planos`,
-                    icon: FileText
+                    icon: FileText,
                 })))
             }
 
@@ -122,13 +135,15 @@ export function GlobalSearch() {
         return () => clearTimeout(timer)
     }, [query, supabase])
 
-    const groups = results.reduce((acc, result) => {
-        if (!acc[result.type]) acc[result.type] = []
-        acc[result.type].push(result)
-        return acc
-    }, {} as Record<string, SearchResult[]>)
+    const visibleResults = query.length >= 2 ? results : []
 
-    const labels: Record<string, string> = {
+    const groups = visibleResults.reduce((acc, result) => {
+        if (!acc[result.type]) acc[result.type] = []
+        acc[result.type]!.push(result)
+        return acc
+    }, {} as Partial<Record<SearchResult['type'], SearchResult[]>>)
+
+    const labels: Record<SearchResult['type'], string> = {
         aluno: 'Alunos',
         candidato: 'Candidatos',
         contrato: 'Contratos',
@@ -136,51 +151,53 @@ export function GlobalSearch() {
     }
 
     return (
-        <div ref={wrapperRef} className="relative w-full max-w-[320px] ml-auto z-50">
-            {/* Input Wrapper */}
+        <div ref={wrapperRef} className="relative z-50 ml-auto w-full max-w-[320px]">
             <div className="relative flex items-center">
-                <Search className="absolute left-3 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 h-4 w-4 text-gray-400" />
                 <input
                     ref={inputRef}
                     type="text"
                     value={query}
                     onChange={(e) => {
-                        setQuery(e.target.value)
+                        const nextQuery = e.target.value
+                        setQuery(nextQuery)
+                        if (nextQuery.length < 2) {
+                            setResults([])
+                            setLoading(false)
+                        }
                         setOpen(true)
                     }}
                     onFocus={() => setOpen(true)}
                     placeholder="Busque por ID, nome, etc."
-                    className="w-full h-10 pl-9 pr-10 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#CC0000]/20 focus:border-[#CC0000] transition-all font-medium text-gray-800 placeholder:text-gray-400 shadow-sm"
+                    className="h-10 w-full rounded-xl border border-gray-200 bg-gray-50/80 pl-9 pr-10 text-sm font-medium text-gray-800 shadow-sm transition-all placeholder:text-gray-400 focus:border-[#CC0000] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#CC0000]/20"
                 />
                 {loading && (
-                    <Loader2 className="absolute right-3 w-4 h-4 text-gray-400 animate-spin" />
+                    <Loader2 className="absolute right-3 h-4 w-4 animate-spin text-gray-400" />
                 )}
             </div>
 
-            {/* Dropdown Modal */}
-            {open && (query.length > 0 || results.length > 0) && (
-                <div className="absolute top-full mt-2 left-0 w-[400px] max-w-[calc(100vw-48px)] bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 overflow-hidden transform origin-top right-0 sm:right-auto sm:left-auto">
-                    <div className="max-h-[60vh] overflow-y-auto overscroll-contain px-2 py-3 custom-scrollbar">
-
+            {open && (query.length > 0 || visibleResults.length > 0) && (
+                <div className="absolute left-0 right-0 top-full mt-2 w-[400px] max-w-[calc(100vw-48px)] origin-top overflow-hidden rounded-xl border border-gray-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] sm:left-auto sm:right-auto">
+                    <div className="custom-scrollbar max-h-[60vh] overflow-y-auto overscroll-contain px-2 py-3">
                         {query.length > 0 && query.length < 2 && (
-                            <p className="text-center text-xs text-gray-400 py-6 font-medium">Digite mais caracteres...</p>
+                            <p className="py-6 text-center text-xs font-medium text-gray-400">Digite mais caracteres...</p>
                         )}
 
-                        {query.length >= 2 && !loading && results.length === 0 && (
-                            <div className="text-center py-8">
-                                <Search className="w-6 h-6 mx-auto mb-2 text-gray-300" />
+                        {query.length >= 2 && !loading && visibleResults.length === 0 && (
+                            <div className="py-8 text-center">
+                                <Search className="mx-auto mb-2 h-6 w-6 text-gray-300" />
                                 <p className="text-sm font-bold text-gray-900">Sem resultados</p>
-                                <p className="text-xs text-gray-500 mt-0.5">Nenhum dado encontrado para &quot;{query}&quot;.</p>
+                                <p className="mt-0.5 text-xs text-gray-500">Nenhum dado encontrado para &quot;{query}&quot;.</p>
                             </div>
                         )}
 
                         {Object.entries(groups).map(([type, items]) => (
                             <div key={type} className="mb-3 last:mb-0">
-                                <h4 className="px-3 pb-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                    {labels[type] || type}
+                                <h4 className="px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                    {labels[type as SearchResult['type']] || type}
                                 </h4>
                                 <div className="space-y-1">
-                                    {items.map((item) => {
+                                    {items?.map((item) => {
                                         const Icon = item.icon
                                         return (
                                             <button
@@ -190,16 +207,16 @@ export function GlobalSearch() {
                                                     setQuery('')
                                                     router.push(item.href)
                                                 }}
-                                                className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors group text-left"
+                                                className="group flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-gray-50"
                                             >
-                                                <div className="w-8 h-8 rounded-lg bg-gray-100 text-[#CC0000] flex items-center justify-center shrink-0 group-hover:bg-[#CC0000] group-hover:text-white transition-colors">
-                                                    <Icon className="w-4 h-4" />
+                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-[#CC0000] transition-colors group-hover:bg-[#CC0000] group-hover:text-white">
+                                                    <Icon className="h-4 w-4" />
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-bold text-gray-900 group-hover:text-[#CC0000] transition-colors truncate">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate text-sm font-bold text-gray-900 transition-colors group-hover:text-[#CC0000]">
                                                         {item.title}
                                                     </p>
-                                                    <p className="text-xs font-medium text-gray-400 truncate">
+                                                    <p className="truncate text-xs font-medium text-gray-400">
                                                         {item.subtitle}
                                                     </p>
                                                 </div>
@@ -211,9 +228,8 @@ export function GlobalSearch() {
                         ))}
                     </div>
 
-                    {/* Footer Clean */}
-                    <div className="bg-gray-50 border-t border-gray-100 p-2.5 text-center">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pesquisa Global KITAMO</p>
+                    <div className="border-t border-gray-100 bg-gray-50 p-2.5 text-center">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Pesquisa Global KITAMO</p>
                     </div>
                 </div>
             )}

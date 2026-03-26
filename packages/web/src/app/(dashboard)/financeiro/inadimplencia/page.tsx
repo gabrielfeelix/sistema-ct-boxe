@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MessageCircle, RefreshCw, AlertOctagon, TrendingDown, ArrowLeft, MoreHorizontal, User } from 'lucide-react'
+import { MessageCircle, RefreshCw, AlertOctagon, TrendingDown, ArrowLeft, User } from 'lucide-react'
 import { useInadimplentes } from '@/hooks/useFinanceiro'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -20,8 +20,6 @@ export default function InadimplenciaPage() {
 
     function abrirWhatsApp(telefone: string, nome: string, valor: number, vencimento: string) {
         const numero = telefone.replace(/\D/g, '')
-        // eslint-disable-next-line react-hooks/purity
-        const diasAtraso = Math.floor((Date.now() - new Date(vencimento).getTime()) / (1000 * 60 * 60 * 24))
         const msg = encodeURIComponent(
             `Olá ${nome.split(' ')[0]}! Tudo certo?\n\nSou do financeiro do CT Boxe, passando para avisar que consta um valor em aberto de ${formatCurrency(valor)} com vencimento em ${formatDate(vencimento).slice(0, 5)}.\n\nPrecisa de ajuda para gerar uma nova cobrança ou enviar a chave PIX?`
         )
@@ -45,7 +43,7 @@ export default function InadimplenciaPage() {
             } else {
                 toast.error('Erro ao integrar com gateway de pagamento.')
             }
-        } catch (error) {
+        } catch {
             toast.error('Falha de conexão.')
         } finally {
             setGerando(null)
@@ -54,7 +52,6 @@ export default function InadimplenciaPage() {
     }
 
     const diasAtraso = (vencimento: string) => {
-        // eslint-disable-next-line react-hooks/purity
         return Math.floor((Date.now() - new Date(vencimento).getTime()) / (1000 * 60 * 60 * 24))
     }
 

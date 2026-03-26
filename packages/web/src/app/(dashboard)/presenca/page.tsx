@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { CalendarCheck2, ChevronRight, Clock, Users, Search, ArrowRight } from 'lucide-react'
+import { CalendarCheck2, Clock, Users, Search, ArrowRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils/formatters'
 import { useAulas } from '@/hooks/useAulas'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'

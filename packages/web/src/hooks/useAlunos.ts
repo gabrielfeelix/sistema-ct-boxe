@@ -1,7 +1,6 @@
-/* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Aluno } from '@/types'
 
@@ -28,9 +27,9 @@ export function useAlunos({
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [total, setTotal] = useState(0)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    const fetch = useCallback(async () => {
+    const loadAlunos = useCallback(async () => {
         setLoading(true)
         setError(null)
 
@@ -42,65 +41,76 @@ export function useAlunos({
                 .limit(limit)
 
             if (busca.trim()) {
-                query = query.or(
-                    `nome.ilike.%${busca}%,email.ilike.%${busca}%,telefone.ilike.%${busca}%`
-                )
+                query = query.or(`nome.ilike.%${busca}%,email.ilike.%${busca}%,telefone.ilike.%${busca}%`)
             }
 
             if (status && status !== 'todos') {
                 query = query.eq('status', status)
             }
 
-            const { data, error: err, count } = await query
+            const { data, error: queryError, count } = await query
 
-            if (err) throw err
+            if (queryError) throw queryError
 
             setAlunos((data as Aluno[]) ?? [])
             setTotal(count ?? 0)
-        } catch (e) {
+        } catch (nextError) {
             setError('Erro ao carregar alunos. Tente novamente.')
-            console.error(e)
+            console.error(nextError)
         } finally {
             setLoading(false)
         }
-    }, [busca, status, limit])
+    }, [busca, limit, status, supabase])
 
     useEffect(() => {
-        fetch()
-    }, [fetch])
+        queueMicrotask(() => {
+            void loadAlunos()
+        })
+    }, [loadAlunos])
 
-    return { alunos, loading, error, total, refetch: fetch }
+    const refetch = useCallback(() => {
+        void loadAlunos()
+    }, [loadAlunos])
+
+    return { alunos, loading, error, total, refetch }
 }
 
-// Hook para buscar um único aluno pelo ID
 export function useAluno(id: string) {
     const [aluno, setAluno] = useState<Aluno | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    const fetch = useCallback(async () => {
+    const loadAluno = useCallback(async () => {
         if (!id) return
-        setLoading(true)
 
-        const { data, error: err } = await supabase
+        setLoading(true)
+        setError(null)
+
+        const { data, error: queryError } = await supabase
             .from('alunos')
             .select('*')
             .eq('id', id)
             .single()
 
-        if (err) {
-            setError('Aluno não encontrado.')
+        if (queryError) {
+            setError('Aluno nÃ£o encontrado.')
         } else {
             setAluno(data as Aluno)
         }
 
         setLoading(false)
-    }, [id])
+    }, [id, supabase])
 
     useEffect(() => {
-        fetch()
-    }, [fetch])
+        queueMicrotask(() => {
+            void loadAluno()
+        })
+    }, [loadAluno])
 
-    return { aluno, loading, error, refetch: fetch }
+    const refetch = useCallback(() => {
+        void loadAluno()
+    }, [loadAluno])
+
+    return { aluno, loading, error, refetch }
 }

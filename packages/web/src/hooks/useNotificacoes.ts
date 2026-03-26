@@ -17,12 +17,9 @@ export function useNotificacoes(professor?: { nome: string; role: string }) {
     const [notificacoes, setNotificacoes] = useState<NotificacaoItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    const fetch = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-
+    const buscarNotificacoes = useCallback(async (): Promise<{ items: NotificacaoItem[]; error: string | null }> => {
         const { data, error: queryError } = await supabase
             .from('notificacoes')
             .select(
@@ -31,10 +28,7 @@ export function useNotificacoes(professor?: { nome: string; role: string }) {
             .order('created_at', { ascending: false })
 
         if (queryError) {
-            setError('Não foi possível carregar as notificações.')
-            setNotificacoes([])
-            setLoading(false)
-            return
+            return { items: [], error: 'NÃ£o foi possÃ­vel carregar as notificaÃ§Ãµes.' }
         }
 
         let results = (data as NotificacaoItem[]) ?? []
@@ -48,13 +42,42 @@ export function useNotificacoes(professor?: { nome: string; role: string }) {
             })
         }
 
-        setNotificacoes(results)
-        setLoading(false)
+        return { items: results, error: null }
     }, [professor, supabase])
 
     useEffect(() => {
-        fetch()
-    }, [fetch])
+        let cancelled = false
+
+        queueMicrotask(() => {
+            void (async () => {
+                setLoading(true)
+                setError(null)
+
+                const { items, error: nextError } = await buscarNotificacoes()
+
+                if (cancelled) return
+
+                setNotificacoes(items)
+                setError(nextError)
+                setLoading(false)
+            })()
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [buscarNotificacoes])
+
+    const refetch = useCallback(async () => {
+        setLoading(true)
+        setError(null)
+
+        const { items, error: nextError } = await buscarNotificacoes()
+
+        setNotificacoes(items)
+        setError(nextError)
+        setLoading(false)
+    }, [buscarNotificacoes])
 
     const naoLidas = useMemo(() => notificacoes.filter((item) => !item.lida).length, [notificacoes])
     const naoLidasInbox = useMemo(
@@ -102,7 +125,7 @@ export function useNotificacoes(professor?: { nome: string; role: string }) {
         naoLidas,
         naoLidasInbox,
         naoLidasAlertas,
-        refetch: fetch,
+        refetch,
         marcarComoLida,
         marcarTodasComoLidas,
         removerNotificacao,

@@ -40,10 +40,6 @@ const DEFAULT_CONFIG: TimerConfig = {
     avisoFimSegundos: 10,
     avisoProximoRoundSegundos: 10,
 }
-
-
-
-const DURACOES_PREPARACAO = [5, 10, 15]
 const DURACOES_TRABALHO = [20, 60, 120, 180, 240, 300]
 const DURACOES_DESCANSO = [10, 30, 45, 60]
 
@@ -127,22 +123,20 @@ export default function TimerPage() {
     useEffect(() => { ativoRef.current = ativo }, [ativo])
     useEffect(() => { somStatusRef.current = somStatus }, [somStatus])
 
-    useEffect(() => {
-        if (typeof window === 'undefined') return
-        const keys = Object.keys(SOUND_SOURCES) as SoundKey[]
-        keys.forEach(key => {
-            const audio = new Audio(SOUND_SOURCES[key])
-            audio.preload = 'auto'
-            audioBasesRef.current[key] = audio
-        })
-
-        fetchPresets()
-    }, [])
-
-    async function fetchPresets() {
+    const fetchPresets = useCallback(async () => {
         const { data } = await supabase.from('timers_presets').select('*').eq('ativo', true).order('created_at', { ascending: true })
         if (data) {
-            const map = data.map((d: any) => ({
+            const map = data.map((d: {
+                id: string
+                nome: string
+                descricao?: string | null
+                rounds: number
+                trabalho_segundos: number
+                descanso_segundos: number
+                preparacao_segundos: number
+                aviso_fim_segundos: number
+                aviso_proximo_round_segundos: number
+            }) => ({
                 id: d.id,
                 nome: d.nome,
                 descricao: d.descricao || `${d.rounds} Rounds x ${formatarMinSeg(d.trabalho_segundos)} / ${formatarMinSeg(d.descanso_segundos)}`,
@@ -157,7 +151,19 @@ export default function TimerPage() {
             }))
             setPresetsDb(map)
         }
-    }
+    }, [supabase])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const keys = Object.keys(SOUND_SOURCES) as SoundKey[]
+        keys.forEach(key => {
+            const audio = new Audio(SOUND_SOURCES[key])
+            audio.preload = 'auto'
+            audioBasesRef.current[key] = audio
+        })
+
+        void fetchPresets()
+    }, [fetchPresets])
 
     const tocarSom = useCallback((key: SoundKey, options: SoundPlaybackOptions = {}) => {
         if (!somStatusRef.current) return
@@ -351,7 +357,7 @@ export default function TimerPage() {
         aplicarConfig(configEdicao)
         setConfigAberto(false)
         setNomePreset('')
-    }, [aplicarConfig, configEdicao, nomePreset, presetsDb.length, supabase])
+    }, [aplicarConfig, configEdicao, fetchPresets, nomePreset, presetsDb.length, supabase])
 
     const handleExcluirPreset = useCallback(async (e: React.MouseEvent, id: string, name: string) => {
         e.stopPropagation()
@@ -362,7 +368,7 @@ export default function TimerPage() {
 
         toast.success('Timer excluído com sucesso.')
         fetchPresets()
-    }, [supabase])
+    }, [fetchPresets, supabase])
 
     const progresso = useMemo(() => {
         const total = Math.max(1, duracaoFaseAtual)

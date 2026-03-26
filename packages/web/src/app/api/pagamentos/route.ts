@@ -2,6 +2,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { Payment, MercadoPagoConfig } from 'mercadopago'
 
+function getErrorMessage(error: unknown) {
+    if (error instanceof Error) return error.message
+    if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
+        return error.message
+    }
+
+    return 'Erro interno.'
+}
+
 export async function POST(req: NextRequest) {
     try {
         const supabase = await createClient()
@@ -77,14 +86,14 @@ export async function POST(req: NextRequest) {
             mercadopago_id: mpResponse.id,
             status: mpResponse.status,
         })
-    } catch (err: any) {
+    } catch (err) {
         console.error('❌ [API PIX] Erro ao gerar cobrança MP:', err)
         // Se for erro do MP, detalha no log
-        if (err.cause) console.error('🔍 Causa detalhada:', err.cause)
+        if (err instanceof Error && err.cause) console.error('🔍 Causa detalhada:', err.cause)
 
         return NextResponse.json({
             error: 'Erro ao gerar cobrança.',
-            details: err.message || 'Erro interno.'
+            details: getErrorMessage(err)
         }, { status: 500 })
     }
 }

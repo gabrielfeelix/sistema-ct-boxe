@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, QrCode, Copy, Check, RefreshCw, XCircle, MessageCircle, AlertTriangle, FileText, CalendarDays } from 'lucide-react'
+import { ArrowLeft, QrCode, Copy, Check, RefreshCw, XCircle, MessageCircle, AlertTriangle, CalendarDays } from 'lucide-react'
 import { useContrato } from '@/hooks/useContratos'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { AvatarInitials } from '@/components/shared/AvatarInitials'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
-import { formatDate, formatCurrency } from '@/lib/utils/formatters'
+import { formatDate } from '@/lib/utils/formatters'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -230,7 +230,10 @@ export default function ContratoDetalhePage() {
                     {qrData.qr_code_base64 ? (
                         <div className="flex justify-center relative z-10">
                             <div className="p-3 bg-white rounded-2xl shadow-sm">
-                                <img src={`data:image/png;base64,${qrData.qr_code_base64}`} alt="QR Code PIX" className="h-56 w-56 rounded-xl border border-gray-100" />
+                                <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={`data:image/png;base64,${qrData.qr_code_base64}`} alt="QR Code PIX" className="h-56 w-56 rounded-xl border border-gray-100" />
+                                </>
                             </div>
                         </div>
                     ) : null}

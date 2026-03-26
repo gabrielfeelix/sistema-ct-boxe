@@ -1,7 +1,6 @@
-/* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Candidato } from '@/types'
 
@@ -15,9 +14,9 @@ export function useCandidatos({ status = '', busca = '' }: UseCandidatosOptions 
     const [loading, setLoading] = useState(true)
     const [total, setTotal] = useState(0)
     const [pendentes, setPendentes] = useState(0)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    const fetch = useCallback(async () => {
+    const loadCandidatos = useCallback(async () => {
         setLoading(true)
 
         let query = supabase
@@ -29,7 +28,7 @@ export function useCandidatos({ status = '', busca = '' }: UseCandidatosOptions 
             query = query.eq('status', status)
         }
 
-        if (busca && busca.trim().length > 0) {
+        if (busca.trim()) {
             query = query.ilike('nome', `%${busca}%`)
         }
 
@@ -37,7 +36,6 @@ export function useCandidatos({ status = '', busca = '' }: UseCandidatosOptions 
         setCandidatos((data as Candidato[]) ?? [])
         setTotal(count ?? 0)
 
-        // Conta pendentes separadamente (para o badge)
         const { count: countPendentes } = await supabase
             .from('candidatos')
             .select('*', { count: 'exact', head: true })
@@ -45,33 +43,46 @@ export function useCandidatos({ status = '', busca = '' }: UseCandidatosOptions 
 
         setPendentes(countPendentes ?? 0)
         setLoading(false)
-    }, [status, busca])
+    }, [busca, status, supabase])
 
     useEffect(() => {
         const delaySearch = setTimeout(() => {
-            fetch()
+            void loadCandidatos()
         }, busca ? 300 : 0)
 
         return () => clearTimeout(delaySearch)
-    }, [fetch])
+    }, [busca, loadCandidatos])
 
-    return { candidatos, loading, total, pendentes, refetch: fetch }
+    const refetch = useCallback(() => {
+        void loadCandidatos()
+    }, [loadCandidatos])
+
+    return { candidatos, loading, total, pendentes, refetch }
 }
 
 export function useCandidato(id: string) {
     const [candidato, setCandidato] = useState<Candidato | null>(null)
     const [loading, setLoading] = useState(true)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    const fetch = useCallback(async () => {
+    const loadCandidato = useCallback(async () => {
         if (!id) return
+
         setLoading(true)
         const { data } = await supabase.from('candidatos').select('*').eq('id', id).single()
         setCandidato(data as Candidato)
         setLoading(false)
-    }, [id])
+    }, [id, supabase])
 
-    useEffect(() => { fetch() }, [fetch])
+    useEffect(() => {
+        queueMicrotask(() => {
+            void loadCandidato()
+        })
+    }, [loadCandidato])
 
-    return { candidato, loading, refetch: fetch }
+    const refetch = useCallback(() => {
+        void loadCandidato()
+    }, [loadCandidato])
+
+    return { candidato, loading, refetch }
 }

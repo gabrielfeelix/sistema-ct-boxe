@@ -1,16 +1,15 @@
-/* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Post, Story } from '@/types'
 
 export function useFeed() {
     const [posts, setPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    const fetch = useCallback(async () => {
+    const loadPosts = useCallback(async () => {
         setLoading(true)
         const { data } = await supabase
             .from('posts')
@@ -18,19 +17,27 @@ export function useFeed() {
             .order('created_at', { ascending: false })
         setPosts((data as Post[]) ?? [])
         setLoading(false)
-    }, [])
+    }, [supabase])
 
-    useEffect(() => { fetch() }, [fetch])
+    useEffect(() => {
+        queueMicrotask(() => {
+            void loadPosts()
+        })
+    }, [loadPosts])
 
-    return { posts, loading, refetch: fetch }
+    const refetch = useCallback(() => {
+        void loadPosts()
+    }, [loadPosts])
+
+    return { posts, loading, refetch }
 }
 
 export function useStories() {
     const [stories, setStories] = useState<Story[]>([])
     const [loading, setLoading] = useState(true)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    const fetch = useCallback(async () => {
+    const loadStories = useCallback(async () => {
         setLoading(true)
         const [categoriasRes, videosRes] = await Promise.all([
             supabase
@@ -65,9 +72,17 @@ export function useStories() {
                 }))
         )
         setLoading(false)
-    }, [])
+    }, [supabase])
 
-    useEffect(() => { fetch() }, [fetch])
+    useEffect(() => {
+        queueMicrotask(() => {
+            void loadStories()
+        })
+    }, [loadStories])
 
-    return { stories, loading, refetch: fetch }
+    const refetch = useCallback(() => {
+        void loadStories()
+    }, [loadStories])
+
+    return { stories, loading, refetch }
 }

@@ -14,7 +14,6 @@ import {
     Megaphone,
     MessageSquare,
     Search,
-    Settings2,
     ShieldAlert,
     Trash2,
     UserCheck,
@@ -27,6 +26,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { useNotificacoes, type NotificacaoItem } from '@/hooks/useNotificacoes'
 import { useProfessoresSelect } from '@/hooks/useProfessores'
 import { createClient } from '@/lib/supabase/client'
+import { resolveNotificationUi } from '@/lib/notifications/presentation'
 
 type Filtro = 'todas' | 'nao_lidas'
 type Tab = 'alunos' | 'gestao' | 'professores' | 'regras'
@@ -92,7 +92,8 @@ function NotificationCard({
     const audience = (item.audiencia ?? 'aluno') as Audience
     const meta = AUDIENCE_META[audience] ?? AUDIENCE_META.aluno
     const AudienceIcon = meta.icon
-    const MainIcon = item.icone && item.icone in ICONS ? ICONS[item.icone as keyof typeof ICONS] : AudienceIcon
+    const ui = resolveNotificationUi(item)
+    const MainIcon = ui.icon || AudienceIcon
 
     return (
         <article
@@ -116,7 +117,7 @@ function NotificationCard({
                     </div>
 
                     <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-700">
+                        <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${ui.bg} ${ui.color}`}>
                             <MainIcon className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">

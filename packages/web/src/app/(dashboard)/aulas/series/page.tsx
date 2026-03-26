@@ -162,7 +162,7 @@ export default function SeriesAulasPage() {
                     <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Manutenção da Agenda</h3>
                 </div>
                 <p className="text-sm font-medium text-gray-500 leading-relaxed max-w-2xl">
-                    As séries são como "moldes". Para que as aulas apareçam no calendário de todos os alunos, você precisa gerar as instâncias reais para um período. Use esta ferramenta para estender a agenda de todo o CT por mais algumas semanas.
+                    As séries são como &quot;moldes&quot;. Para que as aulas apareçam no calendário de todos os alunos, você precisa gerar as instâncias reais para um período. Use esta ferramenta para estender a agenda de todo o CT por mais algumas semanas.
                 </p>
                 <div className="mt-6 flex flex-wrap items-end gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                     <div className="flex-1 min-w-[140px]">

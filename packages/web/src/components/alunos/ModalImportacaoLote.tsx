@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { X, Upload, Download, FileSpreadsheet, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { X, Upload, Download, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
@@ -10,6 +10,8 @@ interface ModalImportacaoLoteProps {
     onClose: () => void
     onSuccess: () => void
 }
+
+type CsvEntry = Record<string, string | undefined>
 
 export function ModalImportacaoLote({ isOpen, onClose, onSuccess }: ModalImportacaoLoteProps) {
     const [loading, setLoading] = useState(false)
@@ -48,7 +50,7 @@ export function ModalImportacaoLote({ isOpen, onClose, onSuccess }: ModalImporta
 
             for (let i = 0; i < dataLines.length; i++) {
                 const values = dataLines[i].split(',').map(v => v.trim())
-                const entry: any = {}
+                const entry: CsvEntry = {}
                 headers.forEach((h, idx) => entry[h] = values[idx])
 
                 if (!entry.nome || !entry.whatsapp) {
@@ -145,10 +147,10 @@ export function ModalImportacaoLote({ isOpen, onClose, onSuccess }: ModalImporta
             setLogs(prev => [...prev, `✅ Concluído! Sucessos: ${sucessos}, Erros/Alertas: ${erros}`])
             toast.success(`Importação finalizada com ${sucessos} sucessos.`)
             onSuccess()
-        } catch (err: any) {
+        } catch (err) {
             console.error(err)
             toast.error('Erro ao processar arquivo.')
-            setLogs(prev => [...prev, `❌ ERRO CRÍTICO: ${err.message}`])
+            setLogs(prev => [...prev, `❌ ERRO CRÍTICO: ${err instanceof Error ? err.message : 'Falha inesperada.'}`])
         } finally {
             setLoading(false)
         }

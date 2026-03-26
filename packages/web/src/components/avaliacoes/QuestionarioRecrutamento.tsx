@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, CheckCircle2, AlertCircle, Save, Loader2, ClipboardList } from 'lucide-react'
+import { Plus, Trash2, Save, Loader2, ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 
@@ -14,7 +14,10 @@ interface Questao {
 interface QuestionarioRecrutamentoProps {
     candidatoId?: string
     alunoId?: string
-    avaliacaoInicial?: any
+    avaliacaoInicial?: {
+        id?: string
+        questoes_json?: Questao[]
+    } | null
     onSave?: () => void
 }
 
@@ -27,9 +30,10 @@ const PERGUNTAS_PADRAO: Questao[] = [
 ]
 
 export function QuestionarioRecrutamento({ candidatoId, alunoId, avaliacaoInicial, onSave }: QuestionarioRecrutamentoProps) {
+    const questoesIniciais = avaliacaoInicial?.questoes_json ?? []
     const [questoes, setQuestoes] = useState<Questao[]>(
-        avaliacaoInicial?.questoes_json?.length > 0
-            ? avaliacaoInicial.questoes_json
+        questoesIniciais.length > 0
+            ? questoesIniciais
             : PERGUNTAS_PADRAO
     )
     const [salvando, setSalvando] = useState(false)
@@ -78,7 +82,7 @@ export function QuestionarioRecrutamento({ candidatoId, alunoId, avaliacaoInicia
             if (error) throw error
             toast.success('Avaliação salva com sucesso!')
             onSave?.()
-        } catch (err: any) {
+        } catch (err) {
             console.error(err)
             toast.error('Erro ao salvar avaliação física.')
         } finally {

@@ -71,7 +71,7 @@ export default function AulasPage() {
         setDataFim(format(end, 'yyyy-MM-dd'));
     }
 
-    const { aulas, loading, error, total, cancelarAula, refetch } = useAulas({
+    const { aulas, loading, error, cancelarAula, refetch } = useAulas({
         busca,
         status,
         categoria,

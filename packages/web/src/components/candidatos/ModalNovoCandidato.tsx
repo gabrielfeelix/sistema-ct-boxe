@@ -45,9 +45,9 @@ export function ModalNovoCandidato({ isOpen, onClose, onSuccess }: ModalNovoCand
             setTelefone('')
             onSuccess()
             onClose()
-        } catch (err: any) {
+        } catch (err) {
             console.error('Erro ao salvar candidato:', err)
-            toast.error('Falha ao salvar candidato: ' + err.message)
+            toast.error(`Falha ao salvar candidato: ${err instanceof Error ? err.message : 'erro inesperado'}`)
         } finally {
             setLoading(false)
         }

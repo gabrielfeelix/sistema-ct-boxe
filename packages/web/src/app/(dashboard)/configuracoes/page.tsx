@@ -39,6 +39,8 @@ function ConfigCard({
     tone: string
     badge?: string
 }) {
+    const toneClass = tone.replace('/20', '/10')
+
     return (
         <Link
             href={href}
@@ -46,7 +48,7 @@ function ConfigCard({
         >
             <div className="relative z-10 flex items-start justify-between gap-4">
                 <div>
-                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700">
+                    <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 ${toneClass} text-gray-700`}>
                         <Icon className="h-5 w-5" />
                     </div>
                     <h3 className="text-lg font-black tracking-tight text-gray-900">{title}</h3>

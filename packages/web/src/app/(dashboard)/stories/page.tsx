@@ -1,12 +1,23 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Video, FolderOpen, PlaySquare, Trash2, Library, Plus, ChevronDown, ChevronUp, Edit3, ArrowUp, ArrowDown, X, ChevronLeft, ChevronRight } from 'lucide-react'
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { EmptyState } from '@/components/shared/EmptyState'
-import { createClient } from '@/lib/supabase/client'
+import {
+    ArrowDown,
+    ArrowUp,
+    Edit3,
+    FolderOpen,
+    Image as ImageIcon,
+    Library,
+    Plus,
+    PlaySquare,
+    Trash2,
+    Video,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
 type TrilhaCategoria = {
     id: string
@@ -22,363 +33,487 @@ type TrilhaVideo = {
     categoria_id: string
     video_url: string
     ordem: number
-    created_at: string
 }
 
 export default function TrilhasPage() {
+    const supabase = useMemo(() => createClient(), [])
     const [categorias, setCategorias] = useState<TrilhaCategoria[]>([])
     const [videos, setVideos] = useState<TrilhaVideo[]>([])
     const [loading, setLoading] = useState(true)
-    const supabase = createClient()
-    const [excluindo, setExcluindo] = useState<string | null>(null)
-    const [excluindoCat, setExcluindoCat] = useState<string | null>(null)
-
-    // Accordion State
-    const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-
-    // Edit State
     const [editingVideo, setEditingVideo] = useState<TrilhaVideo | null>(null)
-    const [savingEdit, setSavingEdit] = useState(false)
+    const [editingCategoria, setEditingCategoria] = useState<TrilhaCategoria | null>(null)
+    const [saving, setSaving] = useState(false)
+    const [uploadandoCapa, setUploadandoCapa] = useState(false)
 
-    // Story Player State
-    const [activeStory, setActiveStory] = useState<{ vids: TrilhaVideo[], index: number } | null>(null)
-
-    async function fetchData() {
-        setLoading(true)
-        const [resCat, resVid] = await Promise.all([
-            supabase.from('trilhas_categorias').select('*').eq('ativo', true).order('ordem', { ascending: true }).order('created_at', { ascending: true }),
-            supabase.from('trilhas_videos').select('*').eq('ativo', true).order('ordem', { ascending: true }).order('created_at', { ascending: false })
+    const fetchData = useCallback(async () => {
+        const [categoriasRes, videosRes] = await Promise.all([
+            supabase
+                .from('trilhas_categorias')
+                .select('*')
+                .eq('ativo', true)
+                .order('ordem', { ascending: true })
+                .order('created_at', { ascending: true }),
+            supabase
+                .from('trilhas_videos')
+                .select('*')
+                .eq('ativo', true)
+                .order('ordem', { ascending: true })
+                .order('created_at', { ascending: false }),
         ])
 
-        if (!resCat.error) setCategorias(resCat.data as TrilhaCategoria[])
-        if (!resVid.error) setVideos(resVid.data as TrilhaVideo[])
-        setLoading(false)
-    }
+        return {
+            categorias: (categoriasRes.data as TrilhaCategoria[]) ?? [],
+            videos: (videosRes.data as TrilhaVideo[]) ?? [],
+        }
+    }, [supabase])
 
     useEffect(() => {
-        fetchData()
-    }, [])
+        let cancelled = false
 
-    const toggleCollapse = (id: string) => {
-        const next = new Set(collapsed)
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
-        setCollapsed(next)
+        queueMicrotask(() => {
+            void (async () => {
+                setLoading(true)
+                const data = await fetchData()
+                if (cancelled) return
+                setCategorias(data.categorias)
+                setVideos(data.videos)
+                setLoading(false)
+            })()
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [fetchData])
+
+    const grupos = useMemo(
+        () =>
+            categorias.map((categoria) => ({
+                ...categoria,
+                videos: videos
+                    .filter((video) => video.categoria_id === categoria.id)
+                    .sort((a, b) => a.ordem - b.ordem),
+            })),
+        [categorias, videos]
+    )
+
+    async function swapCategoria(categoria: TrilhaCategoria, direction: 'up' | 'down') {
+        const idx = categorias.findIndex((item) => item.id === categoria.id)
+        if (direction === 'up' && idx === 0) return
+        if (direction === 'down' && idx === categorias.length - 1) return
+        const alvo = categorias[direction === 'up' ? idx - 1 : idx + 1]
+
+        await supabase.from('trilhas_categorias').update({ ordem: alvo.ordem }).eq('id', categoria.id)
+        await supabase.from('trilhas_categorias').update({ ordem: categoria.ordem }).eq('id', alvo.id)
+        const data = await fetchData()
+        setCategorias(data.categorias)
+        setVideos(data.videos)
     }
 
-    async function handleReorder(video: TrilhaVideo, direction: 'up' | 'down') {
-        const catVideos = videos.filter(v => v.categoria_id === video.categoria_id).sort((a, b) => a.ordem - b.ordem)
-        const idx = catVideos.findIndex(v => v.id === video.id)
+    async function swapVideo(video: TrilhaVideo, direction: 'up' | 'down') {
+        const itens = videos
+            .filter((item) => item.categoria_id === video.categoria_id)
+            .sort((a, b) => a.ordem - b.ordem)
+        const idx = itens.findIndex((item) => item.id === video.id)
 
         if (direction === 'up' && idx === 0) return
-        if (direction === 'down' && idx === catVideos.length - 1) return
+        if (direction === 'down' && idx === itens.length - 1) return
 
-        const targetIdx = direction === 'up' ? idx - 1 : idx + 1
-        const targetVideo = catVideos[targetIdx]
-
-        // Swap ordens
-        const tempOrder = video.ordem
-        const { error: err1 } = await supabase.from('trilhas_videos').update({ ordem: targetVideo.ordem }).eq('id', video.id)
-        const { error: err2 } = await supabase.from('trilhas_videos').update({ ordem: tempOrder }).eq('id', targetVideo.id)
-
-        if (err1 || err2) toast.error('Erro ao reordenar.')
-        else fetchData()
+        const alvo = itens[direction === 'up' ? idx - 1 : idx + 1]
+        await supabase.from('trilhas_videos').update({ ordem: alvo.ordem }).eq('id', video.id)
+        await supabase.from('trilhas_videos').update({ ordem: video.ordem }).eq('id', alvo.id)
+        const data = await fetchData()
+        setCategorias(data.categorias)
+        setVideos(data.videos)
     }
 
-    async function salvarEdicao() {
+    async function salvarVideo() {
         if (!editingVideo) return
-        setSavingEdit(true)
-        const { error } = await supabase.from('trilhas_videos').update({
-            titulo: editingVideo.titulo,
-            descricao: editingVideo.descricao,
-            video_url: editingVideo.video_url
-        }).eq('id', editingVideo.id)
+        setSaving(true)
 
-        if (error) toast.error('Erro ao salvar alterações.')
-        else {
-            toast.success('Vídeo atualizado!')
-            setEditingVideo(null)
-            fetchData()
+        const { error } = await supabase
+            .from('trilhas_videos')
+            .update({
+                titulo: editingVideo.titulo,
+                descricao: editingVideo.descricao,
+                video_url: editingVideo.video_url,
+            })
+            .eq('id', editingVideo.id)
+
+        setSaving(false)
+        if (error) return toast.error('Erro ao salvar video.')
+
+        setEditingVideo(null)
+        toast.success('Video atualizado.')
+        const data = await fetchData()
+        setCategorias(data.categorias)
+        setVideos(data.videos)
+    }
+
+    async function salvarCategoria() {
+        if (!editingCategoria) return
+        setSaving(true)
+
+        const { error } = await supabase
+            .from('trilhas_categorias')
+            .update({
+                nome: editingCategoria.nome.trim(),
+                ordem: Number(editingCategoria.ordem) || 0,
+                capa_url: editingCategoria.capa_url || null,
+            })
+            .eq('id', editingCategoria.id)
+
+        setSaving(false)
+        if (error) return toast.error('Erro ao salvar pasta.')
+
+        setEditingCategoria(null)
+        toast.success('Pasta atualizada.')
+        const data = await fetchData()
+        setCategorias(data.categorias)
+        setVideos(data.videos)
+    }
+
+    async function arquivarCategoria(categoriaId: string) {
+        const { error } = await supabase
+            .from('trilhas_categorias')
+            .update({ ativo: false })
+            .eq('id', categoriaId)
+
+        if (error) return toast.error('Erro ao arquivar pasta.')
+        toast.success('Pasta arquivada.')
+        const data = await fetchData()
+        setCategorias(data.categorias)
+        setVideos(data.videos)
+    }
+
+    async function arquivarVideo(videoId: string) {
+        const { error } = await supabase
+            .from('trilhas_videos')
+            .update({ ativo: false })
+            .eq('id', videoId)
+
+        if (error) return toast.error('Erro ao arquivar video.')
+        toast.success('Video arquivado.')
+        const data = await fetchData()
+        setCategorias(data.categorias)
+        setVideos(data.videos)
+    }
+
+    async function uploadCapa(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        if (!file || !editingCategoria) return
+
+        setUploadandoCapa(true)
+        const ext = file.name.split('.').pop()
+        const path = `trilhas/capas/${Date.now()}-${editingCategoria.id}.${ext}`
+
+        const { error } = await supabase.storage
+            .from('ct-boxe-media')
+            .upload(path, file, { cacheControl: '3600', upsert: true })
+
+        if (error) {
+            setUploadandoCapa(false)
+            return toast.error('Erro ao enviar capa.')
         }
-        setSavingEdit(false)
+
+        const { data } = supabase.storage.from('ct-boxe-media').getPublicUrl(path)
+        setEditingCategoria({ ...editingCategoria, capa_url: data.publicUrl })
+        setUploadandoCapa(false)
     }
 
-    async function excluirCategoria(id: string) {
-        if (!confirm('Excluir permanentemente MÓDULO e TODOS os vídeos contidos nele?')) return
-        setExcluindoCat(id)
-        await supabase.from('trilhas_categorias').update({ ativo: false }).eq('id', id)
-        await supabase.from('trilhas_videos').update({ ativo: false }).eq('categoria_id', id)
-        toast.success('Módulo arquivado.')
-        fetchData()
-        setExcluindoCat(null)
+    if (loading) {
+        return <LoadingSpinner label="Buscando trilhas..." />
     }
-
-    async function excluirVideo(id: string) {
-        if (!confirm('Excluir este vídeo?')) return
-        setExcluindo(id)
-        const { error } = await supabase.from('trilhas_videos').update({ ativo: false }).eq('id', id)
-        if (error) toast.error('Falha ao excluir.')
-        else {
-            toast.success('Vídeo removido.')
-            fetchData()
-        }
-        setExcluindo(null)
-    }
-
-    const listCat = categorias.map(cat => ({
-        ...cat,
-        vids: videos.filter(v => v.categoria_id === cat.id).sort((a, b) => a.ordem - b.ordem)
-    }))
 
     return (
-        <div className="space-y-8 max-w-[1440px] mx-auto pb-8 animate-in slide-in-from-bottom-2 duration-500">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-gray-100 pb-5">
+        <div className="mx-auto max-w-[1440px] space-y-8 pb-8">
+            <div className="flex flex-col gap-4 border-b border-gray-100 pb-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-                        <Library className="w-6 h-6 text-[#CC0000]" /> Biblioteca de Vídeos
+                    <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight text-gray-900">
+                        <Library className="h-6 w-6 text-[#CC0000]" />
+                        Biblioteca de videos
                     </h2>
-                    <p className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">
-                        {loading ? 'Sincronizando...' : `${videos.length} vídeos compartilhados`}
+                    <p className="mt-1 text-sm font-bold uppercase tracking-widest text-gray-400">
+                        {videos.length} videos ativos
                     </p>
                 </div>
                 <Link
                     href="/stories/novo"
-                    className="bg-gray-900 hover:bg-black text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-sm flex items-center gap-2 w-full sm:w-auto justify-center"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-black"
                 >
-                    <Plus className="h-4 w-4" /> Novo Vídeo
+                    <Plus className="h-4 w-4" />
+                    Novo video
                 </Link>
             </div>
 
-            {loading ? <LoadingSpinner label="Buscando currículo..." /> :
-                categorias.length === 0 ? (
-                    <EmptyState
-                        icon={Video}
-                        title="Acervo Vazio"
-                        description="Nenhum vídeo submetido ainda."
-                        action={{ label: 'Adicionar Primeiro', onClick: () => window.location.href = '/stories/novo' }}
-                    />
-                ) : (
-                    <div className="space-y-6">
-                        {listCat.map((cat) => (
-                            <section key={cat.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                                <div
-                                    className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50/50 transition-colors"
-                                    onClick={() => toggleCollapse(cat.id)}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-14 w-14 overflow-hidden rounded-2xl bg-gray-100 text-gray-500">
-                                            {cat.capa_url ? (
-                                                <img src={cat.capa_url} alt={cat.nome} className="h-full w-full object-cover" />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center">
-                                                    <FolderOpen className="w-6 h-6" />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-black text-gray-900 tracking-tight">{cat.nome}</h3>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">{cat.vids.length} aulas • Ordem {cat.ordem}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-                                        <button
-                                            onClick={() => setActiveStory({ vids: cat.vids, index: 0 })}
-                                            className="hidden sm:flex items-center gap-2 px-4 py-2 bg-red-50 text-[#CC0000] text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-100 transition-all"
-                                        >
-                                            <PlaySquare className="w-4 h-4" /> Preview Stories
-                                        </button>
-                                        <button
-                                            onClick={() => excluirCategoria(cat.id)}
-                                            disabled={excluindoCat === cat.id}
-                                            className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                                        >
-                                            <Trash2 className="w-5 h-5" />
-                                        </button>
-                                        <div className="p-2 text-gray-400">
-                                            {collapsed.has(cat.id) ? <ChevronDown /> : <ChevronUp />}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {!collapsed.has(cat.id) && (
-                                    <div className="px-5 pb-6 border-t border-gray-50 pt-6">
-                                        {cat.vids.length === 0 ? (
-                                            <div className="p-12 text-center border-2 border-dashed border-gray-100 rounded-3xl bg-gray-50/30">
-                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Módulo sem vídeos vinculados.</p>
-                                            </div>
+            {grupos.length === 0 ? (
+                <EmptyState
+                    icon={Video}
+                    title="Biblioteca vazia"
+                    description="Nenhum video foi arquivado ainda."
+                    action={{
+                        label: 'Adicionar primeiro video',
+                        onClick: () => (window.location.href = '/stories/novo'),
+                    }}
+                />
+            ) : (
+                <div className="space-y-6">
+                    {grupos.map((categoria) => (
+                        <section
+                            key={categoria.id}
+                            className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm"
+                        >
+                            <div className="flex items-center justify-between p-5">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-14 w-14 overflow-hidden rounded-2xl bg-gray-100">
+                                        {categoria.capa_url ? (
+                                            <>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={categoria.capa_url}
+                                                    alt={categoria.nome}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            </>
                                         ) : (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-                                                {cat.vids.map((video, idx) => (
-                                                    <div key={video.id} className="group relative bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full">
-                                                        <div className="aspect-video bg-black relative">
-                                                            <video src={video.video_url} className="w-full h-full object-cover opacity-80" muted />
-                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                                            <button
-                                                                onClick={() => setActiveStory({ vids: cat.vids, index: idx })}
-                                                                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            >
-                                                                <div className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/30 text-white">
-                                                                    <PlaySquare className="w-6 h-6" />
-                                                                </div>
-                                                            </button>
-                                                        </div>
-                                                        <div className="p-4 flex-1 flex flex-col justify-between">
-                                                            <div>
-                                                                <h4 className="text-sm font-black text-gray-900 group-hover:text-[#CC0000] transition-colors line-clamp-1">{video.titulo}</h4>
-                                                                <p className="text-[10px] text-gray-500 mt-1 line-clamp-2 font-medium leading-relaxed">{video.descricao || 'Sem descrição.'}</p>
-                                                            </div>
-                                                            <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
-                                                                <div className="flex items-center gap-1">
-                                                                    <button onClick={() => handleReorder(video, 'up')} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-900"><ArrowUp className="w-3.5 h-3.5" /></button>
-                                                                    <button onClick={() => handleReorder(video, 'down')} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-900"><ArrowDown className="w-3.5 h-3.5" /></button>
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <button onClick={() => setEditingVideo(video)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors"><Edit3 className="w-4 h-4" /></button>
-                                                                    <button onClick={() => excluirVideo(video.id)} className="p-2 text-gray-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                            <div className="flex h-full w-full items-center justify-center text-gray-400">
+                                                <FolderOpen className="h-6 w-6" />
                                             </div>
                                         )}
                                     </div>
-                                )}
-                            </section>
-                        ))}
-                    </div>
-                )
-            }
+                                    <div>
+                                        <h3 className="text-lg font-black tracking-tight text-gray-900">
+                                            {categoria.nome}
+                                        </h3>
+                                        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                            {categoria.videos.length} videos · ordem {categoria.ordem}
+                                        </p>
+                                    </div>
+                                </div>
 
-            {/* Modal de Edição */}
-            {editingVideo && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-8">
-                            <h3 className="text-xl font-black text-gray-900 mb-6">Editar Publicação</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Título da Aula</label>
-                                    <input
-                                        type="text"
-                                        value={editingVideo.titulo}
-                                        onChange={e => setEditingVideo({ ...editingVideo, titulo: e.target.value })}
-                                        className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-bold outline-none focus:border-[#CC0000] transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Descrição Explicativa</label>
-                                    <textarea
-                                        rows={3}
-                                        value={editingVideo.descricao}
-                                        onChange={e => setEditingVideo({ ...editingVideo, descricao: e.target.value })}
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-medium outline-none focus:border-[#CC0000] transition-all resize-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Link do Vídeo (Embed/Direct)</label>
-                                    <input
-                                        type="text"
-                                        value={editingVideo.video_url}
-                                        onChange={e => setEditingVideo({ ...editingVideo, video_url: e.target.value })}
-                                        className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-medium outline-none focus:border-[#CC0000] transition-all text-gray-500"
-                                    />
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => swapCategoria(categoria, 'up')}
+                                        className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                                    >
+                                        <ArrowUp className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => swapCategoria(categoria, 'down')}
+                                        className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                                    >
+                                        <ArrowDown className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingCategoria(categoria)}
+                                        className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
+                                    >
+                                        <Edit3 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => arquivarCategoria(categoria.id)}
+                                        className="rounded p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
                                 </div>
                             </div>
-                            <div className="mt-8 flex gap-3">
-                                <button
-                                    onClick={() => setEditingVideo(null)}
-                                    className="flex-1 h-12 rounded-2xl border border-gray-200 text-sm font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={salvarEdicao}
-                                    disabled={savingEdit}
-                                    className="flex-[2] h-12 rounded-2xl bg-gray-900 text-white text-sm font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg"
-                                >
-                                    {savingEdit ? 'Salvando...' : 'Salvar Matriz'}
-                                </button>
+
+                            <div className="border-t border-gray-50 px-5 pb-6 pt-6">
+                                {categoria.videos.length === 0 ? (
+                                    <div className="rounded-3xl border-2 border-dashed border-gray-100 bg-gray-50/30 p-12 text-center text-xs font-bold uppercase tracking-widest text-gray-400">
+                                        Pasta sem videos vinculados
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                                        {categoria.videos.map((video) => (
+                                            <div
+                                                key={video.id}
+                                                className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+                                            >
+                                                <div className="relative aspect-video bg-black">
+                                                    <video
+                                                        src={video.video_url}
+                                                        className="h-full w-full object-cover opacity-80"
+                                                        muted
+                                                    />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                                    <a
+                                                        href={video.video_url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity hover:opacity-100"
+                                                    >
+                                                        <div className="rounded-full border border-white/30 bg-white/20 p-3 text-white backdrop-blur-md">
+                                                            <PlaySquare className="h-6 w-6" />
+                                                        </div>
+                                                    </a>
+                                                </div>
+
+                                                <div className="flex flex-1 flex-col justify-between p-4">
+                                                    <div>
+                                                        <h4 className="line-clamp-1 text-sm font-black text-gray-900">
+                                                            {video.titulo}
+                                                        </h4>
+                                                        <p className="mt-1 line-clamp-2 text-[10px] font-medium leading-relaxed text-gray-500">
+                                                            {video.descricao || 'Sem descricao.'}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-4">
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                onClick={() => swapVideo(video, 'up')}
+                                                                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                                                            >
+                                                                <ArrowUp className="h-3.5 w-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => swapVideo(video, 'down')}
+                                                                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                                                            >
+                                                                <ArrowDown className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                onClick={() => setEditingVideo(video)}
+                                                                className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
+                                                            >
+                                                                <Edit3 className="h-4 w-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => arquivarVideo(video.id)}
+                                                                className="rounded p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    </div>
+                        </section>
+                    ))}
                 </div>
             )}
 
-            {/* Story Player Engine */}
-            {activeStory && (
-                <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center p-0 sm:p-4">
-                    <div className="relative w-full h-full sm:max-w-[450px] sm:h-[800px] bg-gray-900 sm:rounded-[3rem] overflow-hidden shadow-2xl flex flex-col">
-                        {/* Progress Bars */}
-                        <div className="absolute top-4 left-4 right-4 z-50 flex gap-1.5 p-1">
-                            {activeStory.vids.map((_, i) => (
-                                <div key={i} className="h-1 flex-1 bg-white/20 overflow-hidden rounded-full">
-                                    <div
-                                        className={`h-full bg-white transition-all duration-300 ${i < activeStory.index ? 'w-full' : i === activeStory.index ? 'w-0 group-active:w-full' : 'w-0'}`}
-                                        style={{ width: i < activeStory.index ? '100%' : i === activeStory.index ? '0%' : '0' }}
-                                    />
-                                </div>
-                            ))}
+            {editingVideo ? (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-lg rounded-[2.5rem] bg-white p-8 shadow-2xl">
+                        <h3 className="mb-6 text-xl font-black text-gray-900">Editar video da trilha</h3>
+                        <div className="space-y-4">
+                            <input
+                                type="text"
+                                value={editingVideo.titulo}
+                                onChange={(e) => setEditingVideo({ ...editingVideo, titulo: e.target.value })}
+                                className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-bold outline-none focus:border-[#CC0000]"
+                            />
+                            <textarea
+                                rows={3}
+                                value={editingVideo.descricao}
+                                onChange={(e) => setEditingVideo({ ...editingVideo, descricao: e.target.value })}
+                                className="w-full rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm font-medium outline-none focus:border-[#CC0000]"
+                            />
+                            <input
+                                type="text"
+                                value={editingVideo.video_url}
+                                onChange={(e) => setEditingVideo({ ...editingVideo, video_url: e.target.value })}
+                                className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-medium outline-none focus:border-[#CC0000]"
+                            />
                         </div>
-
-                        {/* Top Info */}
-                        <div className="absolute top-8 left-6 right-6 z-50 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full border-2 border-red-500 p-0.5">
-                                    <div className="h-full w-full bg-[#CC0000] rounded-full flex items-center justify-center text-white text-[10px] font-black">CT</div>
-                                </div>
-                                <div>
-                                    <p className="text-xs font-black text-white">{activeStory.vids[activeStory.index].titulo}</p>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Story {activeStory.index + 1} de {activeStory.vids.length}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setActiveStory(null)} className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white"><X className="w-5 h-5" /></button>
+                        <div className="mt-8 flex gap-3">
+                            <button
+                                onClick={() => setEditingVideo(null)}
+                                className="h-12 flex-1 rounded-2xl border border-gray-200 text-sm font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={salvarVideo}
+                                disabled={saving}
+                                className="h-12 flex-[2] rounded-2xl bg-gray-900 text-sm font-black uppercase tracking-widest text-white hover:bg-black"
+                            >
+                                {saving ? 'Salvando...' : 'Salvar video'}
+                            </button>
                         </div>
+                    </div>
+                </div>
+            ) : null}
 
-                        {/* Video Content */}
-                        <div className="flex-1 relative flex items-center group">
-                            <video
-                                src={activeStory.vids[activeStory.index].video_url}
-                                className="w-full h-full object-cover"
-                                autoPlay
-                                onEnded={() => {
-                                    if (activeStory.index < activeStory.vids.length - 1) setActiveStory({ ...activeStory, index: activeStory.index + 1 })
-                                    else setActiveStory(null)
-                                }}
+            {editingCategoria ? (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-lg rounded-[2.5rem] bg-white p-8 shadow-2xl">
+                        <h3 className="mb-6 text-xl font-black text-gray-900">Editar pasta de stories</h3>
+                        <div className="space-y-5">
+                            <input
+                                type="text"
+                                value={editingCategoria.nome}
+                                onChange={(e) => setEditingCategoria({ ...editingCategoria, nome: e.target.value })}
+                                className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-bold outline-none focus:border-[#CC0000]"
+                            />
+                            <input
+                                type="number"
+                                value={editingCategoria.ordem}
+                                onChange={(e) =>
+                                    setEditingCategoria({
+                                        ...editingCategoria,
+                                        ordem: Number(e.target.value),
+                                    })
+                                }
+                                className="h-12 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 text-sm font-bold outline-none focus:border-[#CC0000]"
                             />
 
-                            {/* Navigation Areas */}
-                            <div className="absolute inset-y-0 left-0 w-1/3 cursor-pointer" onClick={() => activeStory.index > 0 && setActiveStory({ ...activeStory, index: activeStory.index - 1 })} />
-                            <div className="absolute inset-y-0 right-0 w-1/3 cursor-pointer" onClick={() => {
-                                if (activeStory.index < activeStory.vids.length - 1) setActiveStory({ ...activeStory, index: activeStory.index + 1 })
-                                else setActiveStory(null)
-                            }} />
-
-                            {/* Center Desc (Overlay) */}
-                            <div className="absolute bottom-12 left-6 right-6 p-6 bg-black/40 backdrop-blur-md rounded-3xl border border-white/10">
-                                <p className="text-sm text-white font-medium leading-relaxed">{activeStory.vids[activeStory.index].descricao}</p>
+                            <div>
+                                {editingCategoria.capa_url ? (
+                                    <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={editingCategoria.capa_url}
+                                            alt={editingCategoria.nome}
+                                            className="h-44 w-full rounded-2xl border border-gray-100 object-cover"
+                                        />
+                                    </>
+                                ) : (
+                                    <div className="flex h-44 items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400">
+                                        <ImageIcon className="h-8 w-8" />
+                                    </div>
+                                )}
+                                <label className="mt-3 flex cursor-pointer items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-center hover:border-[#CC0000] hover:bg-red-50/20">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-600">
+                                        {uploadandoCapa ? 'Enviando capa...' : 'Trocar capa'}
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={uploadCapa}
+                                    />
+                                </label>
                             </div>
                         </div>
-
-                        {/* Desktop Side Controls */}
-                        <button
-                            onClick={() => activeStory.index > 0 && setActiveStory({ ...activeStory, index: activeStory.index - 1 })}
-                            className="hidden lg:flex absolute top-1/2 -left-20 -translate-y-1/2 bg-white/10 hover:bg-white/20 p-4 rounded-full text-white transition-all disabled:opacity-30"
-                            disabled={activeStory.index === 0}
-                        >
-                            <ChevronLeft />
-                        </button>
-                        <button
-                            onClick={() => activeStory.index < activeStory.vids.length - 1 && setActiveStory({ ...activeStory, index: activeStory.index + 1 })}
-                            className="hidden lg:flex absolute top-1/2 -right-20 -translate-y-1/2 bg-white/10 hover:bg-white/20 p-4 rounded-full text-white transition-all disabled:opacity-30"
-                            disabled={activeStory.index === activeStory.vids.length - 1}
-                        >
-                            <ChevronRight />
-                        </button>
+                        <div className="mt-8 flex gap-3">
+                            <button
+                                onClick={() => setEditingCategoria(null)}
+                                className="h-12 flex-1 rounded-2xl border border-gray-200 text-sm font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={salvarCategoria}
+                                disabled={saving}
+                                className="h-12 flex-[2] rounded-2xl bg-gray-900 text-sm font-black uppercase tracking-widest text-white hover:bg-black"
+                            >
+                                {saving ? 'Salvando...' : 'Salvar pasta'}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            )}
+            ) : null}
         </div>
     )
 }

@@ -41,7 +41,9 @@ export default function EventosPage() {
     }, [listarEventos])
 
     useEffect(() => {
-        loadData()
+        queueMicrotask(() => {
+            void loadData()
+        })
     }, [loadData])
 
     async function handleDeletar(id: string, titulo: string) {
@@ -115,11 +117,14 @@ export default function EventosPage() {
                             >
                                 {evento.imagem_url ? (
                                     <div className="mb-5 overflow-hidden rounded-2xl border border-gray-100">
-                                        <img
-                                            src={evento.imagem_url}
-                                            alt={evento.titulo}
-                                            className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                                        />
+                                        <>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={evento.imagem_url}
+                                                alt={evento.titulo}
+                                                className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                                            />
+                                        </>
                                     </div>
                                 ) : null}
 

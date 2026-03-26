@@ -92,7 +92,7 @@ export function FeedComposer({ onSuccess, professorAtual }: FeedComposerProps) {
             setExternalUrl('')
             setShowExternal(false)
             onSuccess()
-        } catch (err: any) {
+        } catch (err) {
             console.error(err)
             toast.error('Falha ao publicar.')
         } finally {
@@ -122,7 +122,10 @@ export function FeedComposer({ onSuccess, professorAtual }: FeedComposerProps) {
                             {fileType === 'video' ? (
                                 <video src={previewUrl} className="max-h-60 rounded-2xl border border-gray-100 shadow-sm" controls />
                             ) : (
-                                <img src={previewUrl} alt="Preview" className="max-h-60 rounded-2xl border border-gray-100 shadow-sm" />
+                                <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={previewUrl} alt="Preview" className="max-h-60 rounded-2xl border border-gray-100 shadow-sm" />
+                                </>
                             )}
                             <button
                                 onClick={() => { setFile(null); setPreviewUrl(null); setFileType(null); }}
