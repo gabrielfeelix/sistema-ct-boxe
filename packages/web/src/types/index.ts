@@ -24,6 +24,7 @@ export interface Aluno {
 // ─── Contrato ──────────────────────────────────────────────────────────────
 export type ContratoStatus = 'ativo' | 'vencendo' | 'vencido' | 'cancelado' | 'bloqueado'
 export type TipoPlano = 'mensal' | 'trimestral' | 'semestral' | 'anual'
+export type UnidadeRecorrencia = 'dias' | 'semanas' | 'meses' | 'anos'
 export type StatusPagamento = 'pago' | 'pendente' | 'vencido' | 'cancelado'
 
 export interface Plano {
@@ -33,6 +34,9 @@ export interface Plano {
     valor: number
     descricao?: string
     ativo: boolean
+    recorrencia_intervalo?: number
+    recorrencia_unidade?: UnidadeRecorrencia
+    contrato_modelo_id?: string | null
 }
 
 export interface Contrato {
@@ -208,6 +212,12 @@ export interface PlanoCompleto {
     recorrencia_automatica?: boolean
     tipo_acesso?: 'grupo' | 'individual'
     mercadopago_plan_id?: string | null
+    recorrencia_intervalo?: number
+    recorrencia_unidade?: UnidadeRecorrencia
+    contrato_modelo_id?: string | null
+    contrato_modelo_titulo?: string | null
+    contrato_modelo_versao?: number | null
+    contrato_modelo_slug?: string | null
 }
 
 // ─── Categorização de Aulas ────────────────────────────────────────────────

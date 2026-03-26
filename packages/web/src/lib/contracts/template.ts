@@ -1,4 +1,5 @@
 import { formatDate } from '@/lib/utils/formatters'
+import { formatRecurrenceLabel, getPlanoRecorrencia } from '@/lib/planos/recorrencia'
 import type { PlanoCompleto } from '@/types'
 
 export const CONTRATO_PADRAO_SLUG = 'contrato-padrao'
@@ -76,6 +77,11 @@ function normalizePlanoTipo(tipo: PlanoCompleto['tipo']) {
     return labels[tipo] ?? 'Mensal'
 }
 
+function normalizePlanoLabel(plano: PlanoCompleto) {
+    const recorrencia = getPlanoRecorrencia(plano)
+    return formatRecurrenceLabel(recorrencia.intervalo, recorrencia.unidade)
+}
+
 function formatCurrency(value: number) {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
@@ -101,7 +107,7 @@ export function buildContratoTemplateContext(input: {
         aluno_cpf: input.aluno.cpf?.trim() || 'Nao informado',
         aluno_telefone: input.aluno.telefone?.trim() || 'Nao informado',
         plano_nome: input.plano.nome,
-        plano_tipo: normalizePlanoTipo(input.plano.tipo),
+        plano_tipo: normalizePlanoLabel(input.plano) || normalizePlanoTipo(input.plano.tipo),
         valor: formatCurrency(input.plano.valor),
         data_inicio: formatDate(input.dataInicio),
         data_fim: formatDate(input.dataFim),

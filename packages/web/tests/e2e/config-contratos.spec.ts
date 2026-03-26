@@ -2,8 +2,11 @@ import { expect, test } from '@playwright/test'
 import {
     cleanupAlunoByEmail,
     cleanupContratoModelosByPrefix,
+    cleanupPlanosByPrefix,
+    findContratoModeloByTitle,
     findPendingDocumentoByAlunoEmail,
     seedAluno,
+    seedPlano,
     uniqueTag,
 } from './helpers'
 
@@ -14,6 +17,7 @@ test('creates a new contract template version and emits the shared student docum
     const nome = `${prefix} Aluno`
     const telefone = '(41) 99999-0011'
     const cpf = '12345678910'
+    const nomePlano = `${prefix} Plano`
 
     let alunoId = ''
 
@@ -39,11 +43,21 @@ Emissao: {{data_emissao}}`)
         await expect(page.getByRole('heading', { name: titulo })).toBeVisible()
         await expect(page.getByText(/versao de teste criada pela suite e2e/i)).toBeVisible()
 
+        const modelo = await findContratoModeloByTitle(titulo)
+        expect(modelo?.id).toBeTruthy()
+        await seedPlano({
+            nome: nomePlano,
+            valor: 219.9,
+            contrato_modelo_id: modelo!.id,
+            recorrencia_intervalo: 2,
+            recorrencia_unidade: 'meses',
+        })
+
         await page.goto(`/contratos/novo?aluno_id=${alunoId}`)
         await expect(page.getByRole('heading', { level: 2, name: /registrar contrato/i })).toBeVisible()
         await expect(page.getByText(new RegExp(nome, 'i'))).toBeVisible()
 
-        await page.locator('button').filter({ hasText: 'R$' }).first().click()
+        await page.getByRole('button', { name: new RegExp(nomePlano, 'i') }).click()
         await expect(page.getByText(new RegExp(`CONTRATO TESTE ${prefix}`, 'i'))).toBeVisible()
         await page.getByRole('button', { name: /salvar contrato/i }).click()
 
@@ -62,6 +76,7 @@ Emissao: {{data_emissao}}`)
         expect(documento?.texto).toContain('Plano:')
     } finally {
         await cleanupAlunoByEmail(email)
+        await cleanupPlanosByPrefix(prefix)
         await cleanupContratoModelosByPrefix(prefix)
     }
 })

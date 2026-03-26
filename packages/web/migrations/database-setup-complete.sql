@@ -483,6 +483,16 @@ SELECT
 FROM series_aulas
 ORDER BY dia_semana, hora_inicio;
 
+ALTER TABLE planos
+ADD COLUMN IF NOT EXISTS contrato_modelo_id UUID REFERENCES contrato_modelos(id) ON DELETE SET NULL;
+
+ALTER TABLE planos
+ADD COLUMN IF NOT EXISTS recorrencia_intervalo INTEGER DEFAULT 1 CHECK (recorrencia_intervalo > 0);
+
+ALTER TABLE planos
+ADD COLUMN IF NOT EXISTS recorrencia_unidade TEXT DEFAULT 'meses'
+  CHECK (recorrencia_unidade IN ('dias', 'semanas', 'meses', 'anos'));
+
 -- ============================================
 -- FIM DO SETUP
 -- ============================================

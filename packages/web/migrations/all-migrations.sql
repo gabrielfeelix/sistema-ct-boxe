@@ -89,3 +89,47 @@ CREATE TABLE IF NOT EXISTS contrato_modelos (
 
 CREATE INDEX IF NOT EXISTS idx_contrato_modelos_slug_ativo
   ON contrato_modelos(slug, ativo DESC, versao DESC);
+
+-- ============================================
+-- 008: Vincular planos a contratos e recorrencia customizada
+-- ============================================
+
+ALTER TABLE planos
+ADD COLUMN IF NOT EXISTS contrato_modelo_id UUID REFERENCES contrato_modelos(id) ON DELETE SET NULL;
+
+ALTER TABLE planos
+ADD COLUMN IF NOT EXISTS recorrencia_intervalo INTEGER DEFAULT 1;
+
+ALTER TABLE planos
+ADD COLUMN IF NOT EXISTS recorrencia_unidade TEXT DEFAULT 'meses'
+  CHECK (recorrencia_unidade IN ('dias', 'semanas', 'meses', 'anos'));
+
+UPDATE planos
+SET recorrencia_intervalo = CASE tipo
+    WHEN 'trimestral' THEN 3
+    WHEN 'semestral' THEN 6
+    WHEN 'anual' THEN 1
+    ELSE 1
+  END
+WHERE recorrencia_intervalo IS NULL;
+
+UPDATE planos
+SET recorrencia_unidade = CASE tipo
+    WHEN 'anual' THEN 'anos'
+    ELSE 'meses'
+  END
+WHERE recorrencia_unidade IS NULL;
+
+UPDATE planos
+SET contrato_modelo_id = ativos.id
+FROM (
+  SELECT id
+  FROM contrato_modelos
+  WHERE ativo = true
+  ORDER BY updated_at DESC, versao DESC
+  LIMIT 1
+) AS ativos
+WHERE planos.contrato_modelo_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_planos_contrato_modelo_id
+  ON planos(contrato_modelo_id);

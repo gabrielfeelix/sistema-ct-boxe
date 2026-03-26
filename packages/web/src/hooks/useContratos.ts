@@ -2,17 +2,31 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { deriveLegacyTipo } from '@/lib/planos/recorrencia'
 import type { ContratoCompleto, PlanoCompleto } from '@/types'
 
 interface PlanoRaw {
     id: string
     nome: string
-    tipo: PlanoCompleto['tipo']
+    tipo: PlanoCompleto['tipo'] | null
     valor?: number | null
     valor_mensal?: number | null
     descricao?: string | null
     ativo?: boolean | null
     created_at: string
+    recorrencia_automatica?: boolean | null
+    tipo_acesso?: PlanoCompleto['tipo_acesso'] | null
+    mercadopago_plan_id?: string | null
+    recorrencia_intervalo?: number | null
+    recorrencia_unidade?: PlanoCompleto['recorrencia_unidade'] | null
+    contrato_modelo_id?: string | null
+}
+
+interface ContratoModeloLookup {
+    id: string
+    titulo: string
+    versao: number
+    slug: string
 }
 
 interface UseContratosOptions {
@@ -40,18 +54,50 @@ export function usePlanos(apenasAtivos = false) {
             return
         }
 
-        const normalizados: PlanoCompleto[] = ((data as PlanoRaw[]) ?? []).map((item) => {
+        const planosRaw = (data as PlanoRaw[]) ?? []
+        const contratoIds = [...new Set(planosRaw.map((item) => item.contrato_modelo_id).filter(Boolean))] as string[]
+        let contratoLookup = new Map<string, ContratoModeloLookup>()
+
+        if (contratoIds.length > 0) {
+            const { data: contratosData, error: contratosError } = await supabase
+                .from('contrato_modelos')
+                .select('id,titulo,versao,slug')
+                .in('id', contratoIds)
+
+            if (contratosError) {
+                console.error(contratosError)
+            } else {
+                contratoLookup = new Map(
+                    ((contratosData as ContratoModeloLookup[]) ?? []).map((modelo) => [modelo.id, modelo])
+                )
+            }
+        }
+
+        const normalizados: PlanoCompleto[] = planosRaw.map((item) => {
             const valorBase = Number(item.valor ?? 0)
             const valorMensal = Number(item.valor_mensal ?? 0)
             const valor = valorBase > 0 ? valorBase : valorMensal
+            const recorrencia_intervalo = Number(item.recorrencia_intervalo ?? 1)
+            const recorrencia_unidade = item.recorrencia_unidade ?? 'meses'
+            const contrato = item.contrato_modelo_id ? contratoLookup.get(item.contrato_modelo_id) : null
+
             return {
                 id: item.id,
                 nome: item.nome,
-                tipo: (item.tipo ?? 'mensal') as PlanoCompleto['tipo'],
+                tipo: (item.tipo ?? deriveLegacyTipo(recorrencia_intervalo, recorrencia_unidade)) as PlanoCompleto['tipo'],
                 valor: Number.isFinite(valor) ? valor : 0,
                 descricao: item.descricao ?? '',
                 ativo: Boolean(item.ativo),
                 created_at: item.created_at,
+                recorrencia_automatica: item.recorrencia_automatica ?? false,
+                tipo_acesso: item.tipo_acesso ?? 'grupo',
+                mercadopago_plan_id: item.mercadopago_plan_id ?? null,
+                recorrencia_intervalo,
+                recorrencia_unidade,
+                contrato_modelo_id: item.contrato_modelo_id ?? null,
+                contrato_modelo_titulo: contrato?.titulo ?? null,
+                contrato_modelo_versao: contrato?.versao ?? null,
+                contrato_modelo_slug: contrato?.slug ?? null,
             }
         })
 

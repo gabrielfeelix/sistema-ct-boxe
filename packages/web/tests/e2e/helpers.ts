@@ -134,6 +134,81 @@ export async function cleanupContratoModelosByPrefix(prefix: string) {
     await supabase.from('contrato_modelos').delete().ilike('titulo', `${prefix}%`)
 }
 
+export async function findContratoModeloByTitle(title: string) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) {
+        throw new Error('Service role client not configured for contract model lookup.')
+    }
+
+    const { data, error } = await supabase
+        .from('contrato_modelos')
+        .select('id,titulo,versao')
+        .eq('titulo', title)
+        .order('versao', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (error) {
+        throw new Error(error.message)
+    }
+
+    return data
+}
+
+export async function seedPlano(input: {
+    nome: string
+    valor: number
+    descricao?: string
+    contrato_modelo_id: string
+    recorrencia_intervalo?: number
+    recorrencia_unidade?: 'dias' | 'semanas' | 'meses' | 'anos'
+}) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) {
+        throw new Error('Service role client not configured for plan seed.')
+    }
+
+    const recorrencia_intervalo = input.recorrencia_intervalo ?? 1
+    const recorrencia_unidade = input.recorrencia_unidade ?? 'meses'
+
+    const tipo =
+        recorrencia_unidade === 'anos' && recorrencia_intervalo === 1
+            ? 'anual'
+            : recorrencia_unidade === 'meses' && recorrencia_intervalo === 6
+              ? 'semestral'
+              : recorrencia_unidade === 'meses' && recorrencia_intervalo === 3
+                ? 'trimestral'
+                : 'mensal'
+
+    const { data, error } = await supabase
+        .from('planos')
+        .insert({
+            nome: input.nome,
+            tipo,
+            valor: input.valor,
+            descricao: input.descricao ?? null,
+            ativo: true,
+            contrato_modelo_id: input.contrato_modelo_id,
+            recorrencia_intervalo,
+            recorrencia_unidade,
+        })
+        .select('id')
+        .single()
+
+    if (error || !data) {
+        throw new Error(error?.message ?? 'Failed to seed plan.')
+    }
+
+    return data.id as string
+}
+
+export async function cleanupPlanosByPrefix(prefix: string) {
+    const supabase = getServiceRoleClient()
+    if (!supabase) return
+
+    await supabase.from('planos').delete().ilike('nome', `${prefix}%`)
+}
+
 export async function findPendingDocumentoByAlunoEmail(email: string) {
     const supabase = getServiceRoleClient()
     if (!supabase) {

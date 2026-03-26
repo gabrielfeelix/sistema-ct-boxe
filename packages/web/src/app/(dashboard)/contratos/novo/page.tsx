@@ -4,27 +4,15 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, FileCheck, FileText } from 'lucide-react'
 import { toast } from 'sonner'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { createClient } from '@/lib/supabase/client'
 import { usePlanos } from '@/hooks/useContratos'
-import { useContratoModelos } from '@/hooks/useContratoModelos'
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { formatDate } from '@/lib/utils/formatters'
 import { buildContratoTemplateContext, renderContractTemplate } from '@/lib/contracts/template'
-import type { Aluno, PlanoCompleto } from '@/types'
+import { addRecurrence, formatRecurrenceLabel, getPlanoRecorrencia } from '@/lib/planos/recorrencia'
+import { formatDate } from '@/lib/utils/formatters'
+import type { Aluno, ContratoModelo, PlanoCompleto } from '@/types'
 
 type AlunoSelecionavel = Pick<Aluno, 'id' | 'nome' | 'email' | 'cpf' | 'telefone'>
-
-function calcularDataFim(dataInicio: string, tipoPlano: PlanoCompleto['tipo']) {
-    const data = new Date(`${dataInicio}T00:00:00`)
-    const diasPorPlano: Record<PlanoCompleto['tipo'], number> = {
-        mensal: 30,
-        trimestral: 90,
-        semestral: 180,
-        anual: 365,
-    }
-    data.setDate(data.getDate() + diasPorPlano[tipoPlano])
-    return data.toISOString().slice(0, 10)
-}
 
 function NovoContratoForm() {
     const router = useRouter()
@@ -33,27 +21,28 @@ function NovoContratoForm() {
     const supabase = createClient()
 
     const { planos, loading: loadingPlanos } = usePlanos(true)
-    const { modeloAtivo, loading: loadingModeloAtivo } = useContratoModelos({ apenasAtivo: true })
     const [saving, setSaving] = useState(false)
+    const [loadingModeloPlano, setLoadingModeloPlano] = useState(false)
 
     const [alunoBusca, setAlunoBusca] = useState('')
     const [alunosEncontrados, setAlunosEncontrados] = useState<AlunoSelecionavel[]>([])
     const [alunoSelecionado, setAlunoSelecionado] = useState<AlunoSelecionavel | null>(null)
-
     const [planoSelecionado, setPlanoSelecionado] = useState<PlanoCompleto | null>(null)
+    const [contratoModelo, setContratoModelo] = useState<ContratoModelo | null>(null)
     const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10))
     const [renovacaoAutomatica, setRenovacaoAutomatica] = useState(false)
 
     const dataFim = useMemo(() => {
         if (!planoSelecionado) return ''
-        return calcularDataFim(dataInicio, planoSelecionado.tipo)
+        const recorrencia = getPlanoRecorrencia(planoSelecionado)
+        return addRecurrence(dataInicio, recorrencia.intervalo, recorrencia.unidade)
     }, [dataInicio, planoSelecionado])
 
     const previewContrato = useMemo(() => {
-        if (!modeloAtivo || !alunoSelecionado || !planoSelecionado || !dataFim) return null
+        if (!contratoModelo || !alunoSelecionado || !planoSelecionado || !dataFim) return null
 
         return renderContractTemplate(
-            modeloAtivo.conteudo,
+            contratoModelo.conteudo,
             buildContratoTemplateContext({
                 aluno: alunoSelecionado,
                 plano: planoSelecionado,
@@ -62,7 +51,7 @@ function NovoContratoForm() {
                 renovacaoAutomatica,
             })
         )
-    }, [alunoSelecionado, dataFim, dataInicio, modeloAtivo, planoSelecionado, renovacaoAutomatica])
+    }, [alunoSelecionado, contratoModelo, dataFim, dataInicio, planoSelecionado, renovacaoAutomatica])
 
     useEffect(() => {
         if (!alunoIdParam) return
@@ -79,6 +68,43 @@ function NovoContratoForm() {
 
         fetchAlunoSelecionado()
     }, [alunoIdParam, supabase])
+
+    useEffect(() => {
+        const contratoModeloId = planoSelecionado?.contrato_modelo_id
+        if (!contratoModeloId) {
+            setContratoModelo(null)
+            return
+        }
+
+        let cancelled = false
+        setLoadingModeloPlano(true)
+
+        async function fetchContratoModelo() {
+            const { data, error } = await supabase
+                .from('contrato_modelos')
+                .select('*')
+                .eq('id', contratoModeloId)
+                .single()
+
+            if (cancelled) return
+
+            if (error) {
+                console.error(error)
+                setContratoModelo(null)
+                setLoadingModeloPlano(false)
+                return
+            }
+
+            setContratoModelo(data as ContratoModelo)
+            setLoadingModeloPlano(false)
+        }
+
+        fetchContratoModelo()
+
+        return () => {
+            cancelled = true
+        }
+    }, [planoSelecionado?.contrato_modelo_id, supabase])
 
     useEffect(() => {
         if (!alunoBusca.trim() || alunoSelecionado) {
@@ -113,8 +139,13 @@ function NovoContratoForm() {
             return
         }
 
-        if (!modeloAtivo || !previewContrato) {
-            toast.error('Publique uma versao ativa do contrato em Configuracoes > Contratos antes de emitir.')
+        if (!planoSelecionado.contrato_modelo_id) {
+            toast.error('Este plano ainda nao tem contrato vinculado. Ajuste em Configuracoes > Planos.')
+            return
+        }
+
+        if (!contratoModelo || !previewContrato) {
+            toast.error('Nao foi possivel carregar o contrato vinculado ao plano.')
             return
         }
 
@@ -122,11 +153,7 @@ function NovoContratoForm() {
 
         try {
             await Promise.all([
-                supabase
-                    .from('contratos')
-                    .update({ status: 'cancelado' })
-                    .eq('aluno_id', alunoSelecionado.id)
-                    .neq('status', 'cancelado'),
+                supabase.from('contratos').update({ status: 'cancelado' }).eq('aluno_id', alunoSelecionado.id).neq('status', 'cancelado'),
                 supabase
                     .from('aluno_documentos')
                     .update({ status: 'cancelado' })
@@ -144,15 +171,10 @@ function NovoContratoForm() {
                 renovacao_automatica: renovacaoAutomatica,
             }
 
-            const { data: contrato, error: contratoError } = await supabase
-                .from('contratos')
-                .insert(payload)
-                .select('id')
-                .single()
-
+            const { data: contrato, error: contratoError } = await supabase.from('contratos').insert(payload).select('id').single()
             if (contratoError) throw contratoError
 
-            const documentoTitulo = `${modeloAtivo.titulo} v${modeloAtivo.versao} - ${planoSelecionado.nome}`
+            const documentoTitulo = `${contratoModelo.titulo} v${contratoModelo.versao} - ${planoSelecionado.nome}`
             const { error: documentoError } = await supabase.from('aluno_documentos').insert({
                 aluno_id: alunoSelecionado.id,
                 titulo: documentoTitulo,
@@ -166,7 +188,7 @@ function NovoContratoForm() {
                 throw documentoError
             }
 
-            toast.success('Contrato registrado com sucesso!')
+            toast.success('Contrato registrado com sucesso.')
 
             try {
                 const pgtoResponse = await fetch('/api/pagamentos', {
@@ -185,7 +207,7 @@ function NovoContratoForm() {
                 if (pgtoResponse.ok) {
                     const pgtoData = await pgtoResponse.json()
                     if (pgtoData.pix_copia_cola) {
-                        toast.success('Cobranca PIX gerada! QR code disponivel no Financeiro.')
+                        toast.success('Cobranca PIX gerada.')
                     } else {
                         toast.info('Pagamento registrado como pendente.')
                     }
@@ -244,28 +266,28 @@ function NovoContratoForm() {
             <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
                 <div className="space-y-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
                     <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex flex-col gap-3">
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">Modelo compartilhado</p>
+                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">Contrato do plano</p>
                                 <h3 className="mt-1 flex items-center gap-2 text-sm font-black text-gray-900">
                                     <FileText className="h-4 w-4 text-[#CC0000]" />
-                                    {loadingModeloAtivo
-                                        ? 'Carregando contrato ativo...'
-                                        : modeloAtivo
-                                            ? `${modeloAtivo.titulo} v${modeloAtivo.versao}`
-                                            : 'Nenhuma versao ativa'}
+                                    {loadingModeloPlano
+                                        ? 'Carregando contrato do plano...'
+                                        : contratoModelo
+                                          ? `${contratoModelo.titulo} v${contratoModelo.versao}`
+                                          : 'Selecione um plano com contrato vinculado'}
                                 </h3>
                                 <p className="mt-1 text-xs font-medium text-gray-500">
-                                    O contrato ativo e transformado em snapshot e salvo em aluno_documentos.
+                                    O snapshot salvo em aluno_documentos sai diretamente do contrato associado ao plano escolhido.
                                 </p>
                             </div>
-                            {!loadingModeloAtivo && !modeloAtivo && (
+                            {!planoSelecionado?.contrato_modelo_id && (
                                 <button
                                     type="button"
-                                    onClick={() => router.push('/configuracoes/contratos')}
+                                    onClick={() => router.push('/configuracoes/planos')}
                                     className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-100"
                                 >
-                                    Configurar contratos
+                                    Ajustar planos
                                 </button>
                             )}
                         </div>
@@ -357,7 +379,17 @@ function NovoContratoForm() {
                                         <p className="mt-1 text-lg font-bold text-gray-900">
                                             R$ {plano.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </p>
-                                        <p className="mt-1 text-xs font-medium text-gray-500">{plano.tipo}</p>
+                                        <p className="mt-1 text-xs font-medium text-gray-500">
+                                            {formatRecurrenceLabel(
+                                                getPlanoRecorrencia(plano).intervalo,
+                                                getPlanoRecorrencia(plano).unidade
+                                            )}
+                                        </p>
+                                        <p className="mt-2 text-xs font-semibold text-gray-400">
+                                            {plano.contrato_modelo_titulo
+                                                ? `Contrato: ${plano.contrato_modelo_titulo} v${plano.contrato_modelo_versao ?? '-'}`
+                                                : 'Sem contrato vinculado'}
+                                        </p>
                                     </button>
                                 ))}
                             </div>
@@ -401,7 +433,17 @@ function NovoContratoForm() {
                                 <li>Aluno: {alunoSelecionado.nome}</li>
                                 <li>Plano: {planoSelecionado.nome}</li>
                                 <li>
+                                    Recorrencia:{' '}
+                                    {formatRecurrenceLabel(
+                                        getPlanoRecorrencia(planoSelecionado).intervalo,
+                                        getPlanoRecorrencia(planoSelecionado).unidade
+                                    )}
+                                </li>
+                                <li>
                                     Vigencia: {formatDate(dataInicio)} ate {formatDate(dataFim)}
+                                </li>
+                                <li>
+                                    Contrato: {contratoModelo ? `${contratoModelo.titulo} v${contratoModelo.versao}` : 'Nao carregado'}
                                 </li>
                                 <li className="pt-1 text-base font-bold">
                                     Valor: R$ {planoSelecionado.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -421,7 +463,7 @@ function NovoContratoForm() {
                         <button
                             type="button"
                             onClick={handleSalvarContrato}
-                            disabled={saving || !alunoSelecionado || !planoSelecionado || !modeloAtivo}
+                            disabled={saving || !alunoSelecionado || !planoSelecionado || !contratoModelo}
                             className="inline-flex h-10 items-center justify-center rounded-lg bg-[#CC0000] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#AA0000] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {saving ? (
@@ -447,16 +489,16 @@ function NovoContratoForm() {
                                 Este e o texto que sera salvo para leitura e assinatura no app.
                             </p>
                         </div>
-                        {modeloAtivo && (
+                        {contratoModelo && (
                             <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">
-                                v{modeloAtivo.versao}
+                                v{contratoModelo.versao}
                             </span>
                         )}
                     </div>
 
                     <pre className="mt-5 min-h-[640px] rounded-2xl border border-gray-200 bg-gray-950 p-4 text-xs leading-6 text-gray-100 whitespace-pre-wrap">
                         {previewContrato ??
-                            'Selecione aluno, plano e uma versao ativa do contrato para visualizar o texto final.'}
+                            'Selecione aluno e um plano que tenha contrato vinculado para visualizar o texto final.'}
                     </pre>
                 </div>
             </section>
