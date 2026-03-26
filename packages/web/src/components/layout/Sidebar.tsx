@@ -75,9 +75,9 @@ export function Sidebar() {
                     <Image
                         src="/logo-ct.png"
                         alt="CT de Boxe Argel Riboli"
-                        width={144}
-                        height={72}
-                        className="h-auto w-[144px] max-w-full object-contain"
+                        width={96}
+                        height={48}
+                        className="h-auto w-[96px] max-w-full object-contain"
                         priority
                     />
                 </div>
